@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">yiding</string>
+    <string name="app_name">app</string>
+    <string name="habit_name">Habit Name</string>
 </resources>
