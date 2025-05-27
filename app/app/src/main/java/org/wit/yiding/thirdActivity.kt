@@ -75,11 +75,39 @@ class thirdActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_delete_habits).setOnClickListener {
             deleteSelectedHabits()
         }
-
+        findViewById<Button>(R.id.btn_edit_habits).setOnClickListener{
+            editHabits()
+        }
         // 加载已保存的习惯
         loadSavedHabits()
     }
+    private fun editHabits() {
+        if (selectedRows.isEmpty()) {
+            Toast.makeText(this, "请先选择要编辑的习惯", Toast.LENGTH_SHORT).show()
+            return
+        }
 
+        if (selectedRows.size > 1) {
+            Toast.makeText(this, "一次只能编辑一个习惯", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val selectedRowId = selectedRows.first()
+        val habitEntry = habitEntries.firstOrNull { it.id == selectedRowId }
+
+        habitEntry?.let { entry ->
+            val intent = Intent(this, habitsActivity::class.java).apply {
+                putExtra(habitsActivity.EXTRA_IS_EDIT_MODE, true)
+                putExtra(habitsActivity.EXTRA_ORIGINAL_HABIT_ID, entry.id)  // 传递原始ID
+                putExtra(habitsActivity.EXTRA_HABIT_NAME, entry.name)
+                putExtra(habitsActivity.EXTRA_DESCRIPTION, entry.description)
+                entry.imageUri?.let { uri ->
+                    putExtra(habitsActivity.EXTRA_IMAGE_URI, uri.toString())
+                }
+            }
+            startActivityForResult(intent, ADD_HABIT_REQUEST)
+        }
+    }
     private fun loadSavedHabits() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
@@ -99,14 +127,43 @@ class thirdActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == ADD_HABIT_REQUEST && resultCode == RESULT_OK) {
-            val habitName = data?.getStringExtra("habitName") ?: ""
-            val description = data?.getStringExtra("description") ?: ""
-            val imageUri = data?.getStringExtra("imageUri")?.let { Uri.parse(it) }
-            addHabitRow(habitName, description, imageUri)
-            saveHabitsToPrefs() // 保存新添加的习惯
+            val isEdit = data?.getBooleanExtra(habitsActivity.EXTRA_IS_EDIT_MODE, false) ?: false
+            val originalId = data?.getIntExtra(habitsActivity.EXTRA_ORIGINAL_HABIT_ID, -1) ?: -1
+
+            val habitName = data?.getStringExtra(habitsActivity.EXTRA_HABIT_NAME) ?: ""
+            val description = data?.getStringExtra(habitsActivity.EXTRA_DESCRIPTION) ?: ""
+            val imageUri = data?.getStringExtra(habitsActivity.EXTRA_IMAGE_URI)?.let { Uri.parse(it) }
+
+            if (isEdit && originalId != -1) {
+                // 替换原有习惯
+                val index = habitEntries.indexOfFirst { it.id == originalId }
+                if (index != -1) {
+                    // 保留原始ID，只更新内容
+                    habitEntries[index] = HabitEntry(originalId, habitName, description, imageUri)
+                    updateHabitRow(originalId, habitName, description, imageUri)
+                }
+            } else {
+                // 添加新习惯
+                addHabitRow(habitName, description, imageUri)
+            }
+            saveHabitsToPrefs()
+            selectedRows.clear()  // 清空选择
         }
     }
+    private fun updateHabitRow(rowId: Int, habitName: String, description: String, imageUri: Uri?) {
+        val row = tableContainer.findViewById<LinearLayout>(rowId)
+        row?.let {
+            val textView = it.getChildAt(0) as TextView
+            textView.text = "$habitName: $description"
 
+            val imageView = it.getChildAt(1) as ImageView
+            imageUri?.let { uri ->
+                imageView.setImageURI(uri)
+            } ?: run {
+                imageView.setImageResource(R.drawable.ic_default_image)
+            }
+        }
+    }
     private fun addHabitRow(habitName: String, description: String, imageUri: Uri?) {
         val rowId = View.generateViewId()
 
