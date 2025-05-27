@@ -47,11 +47,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, thirdActivity::class.java))
         }
 
-        // 设置Habits的Add按钮点击事件
-        findViewById<Button>(R.id.btn_add_habits).setOnClickListener {
-            addNewHabitRow()
-        }
-
         // 设置Edit按钮点击事件
         btnEdit.setOnClickListener {
             toggleEditMode()
@@ -75,36 +70,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun addNewHabitRow() {
-        val rowId = View.generateViewId()
-        val row = TextView(this).apply {
-            id = rowId
-            text = "Habit ${rowCount + 1}"
-            textSize = 16f
-            gravity = android.view.Gravity.CENTER
-            layoutParams = ConstraintLayout.LayoutParams(
-                ConstraintLayout.LayoutParams.MATCH_CONSTRAINT,
-                ConstraintLayout.LayoutParams.WRAP_CONTENT
-            )
-            setBackgroundResource(R.drawable.row_background)
-        }
-
-        tableContainer.addView(row)
-
-        val constraintSet = ConstraintSet()
-        constraintSet.clone(tableContainer)
-
-        if (rowCount == 0) {
-            constraintSet.connect(rowId, ConstraintSet.TOP, tableContainer.id, ConstraintSet.TOP)
-        } else {
-            val prevRowId = tableContainer.getChildAt(rowCount - 1).id
-            constraintSet.connect(rowId, ConstraintSet.TOP, prevRowId, ConstraintSet.BOTTOM)
-        }
-
-        constraintSet.connect(rowId, ConstraintSet.START, tableContainer.id, ConstraintSet.START)
-        constraintSet.connect(rowId, ConstraintSet.END, tableContainer.id, ConstraintSet.END)
-        constraintSet.applyTo(tableContainer)
-
-        rowCount++
-    }
 }

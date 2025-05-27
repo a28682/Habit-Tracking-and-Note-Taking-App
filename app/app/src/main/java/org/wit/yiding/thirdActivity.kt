@@ -17,15 +17,30 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-
+import android.content.SharedPreferences
+object SharedPrefsConstants {
+    const val PREFS_NAME = "HabitTrackerPrefs"  // SharedPreferences 文件名
+    const val KEY_HABIT_COUNT = "habit_count"   // 存储习惯数量的键
+    const val KEY_HABIT_PREFIX = "habit_"       // 习惯条目前缀
+}
 class thirdActivity : AppCompatActivity() {
 
     private lateinit var tableContainer: ConstraintLayout
     private var rowCount = 0
+    private val selectedRows = mutableListOf<Int>() // 存储选中行的ID
+    private val habitEntries = mutableListOf<HabitEntry>() // 存储习惯条目
 
     companion object {
         const val ADD_HABIT_REQUEST = 1001
     }
+
+    // 内部数据类，存储习惯信息
+    private data class HabitEntry(
+        val id: Int,
+        val name: String,
+        val description: String,
+        val imageUri: Uri?
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +70,30 @@ class thirdActivity : AppCompatActivity() {
             val intent = Intent(this, habitsActivity::class.java)
             startActivityForResult(intent, ADD_HABIT_REQUEST)
         }
+
+        // 设置Delete按钮点击事件
+        findViewById<Button>(R.id.btn_delete_habits).setOnClickListener {
+            deleteSelectedHabits()
+        }
+
+        // 加载已保存的习惯
+        loadSavedHabits()
+    }
+
+    private fun loadSavedHabits() {
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+        val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
+
+        for (i in 0 until habitCount) {
+            val name = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") ?: ""
+            val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
+            val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
+            val uri = uriString?.let { Uri.parse(it) }
+
+            if (name.isNotEmpty()) {
+                addHabitRow(name, desc, uri)
+            }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -64,11 +103,16 @@ class thirdActivity : AppCompatActivity() {
             val description = data?.getStringExtra("description") ?: ""
             val imageUri = data?.getStringExtra("imageUri")?.let { Uri.parse(it) }
             addHabitRow(habitName, description, imageUri)
+            saveHabitsToPrefs() // 保存新添加的习惯
         }
     }
 
     private fun addHabitRow(habitName: String, description: String, imageUri: Uri?) {
         val rowId = View.generateViewId()
+
+        // 创建习惯条目对象
+        val entry = HabitEntry(rowId, habitName, description, imageUri)
+        habitEntries.add(entry)
 
         // 创建水平布局的行
         val row = LinearLayout(this).apply {
@@ -77,11 +121,16 @@ class thirdActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = ConstraintLayout.LayoutParams(
                 ConstraintLayout.LayoutParams.MATCH_PARENT,
-                ConstraintLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
             }
-            background = ContextCompat.getDrawable(context, R.drawable.row_background)
+            background = ContextCompat.getDrawable(context, R.drawable.row_background_unselected)
+
+            // 设置点击事件
+            setOnClickListener {
+                toggleRowSelection(rowId)
+            }
         }
 
         // 左侧文本部分
@@ -135,6 +184,92 @@ class thirdActivity : AppCompatActivity() {
         constraintSet.applyTo(tableContainer)
 
         rowCount++
+    }
+
+    private fun toggleRowSelection(rowId: Int) {
+        if (selectedRows.contains(rowId)) {
+            // 取消选中
+            selectedRows.remove(rowId)
+            tableContainer.findViewById<LinearLayout>(rowId)?.background =
+                ContextCompat.getDrawable(this, R.drawable.row_background_unselected)
+        } else {
+            // 选中
+            selectedRows.add(rowId)
+            tableContainer.findViewById<LinearLayout>(rowId)?.background =
+                ContextCompat.getDrawable(this, R.drawable.row_background_selected)
+        }
+    }
+
+    private fun deleteSelectedHabits() {
+        if (selectedRows.isEmpty()) {
+            Toast.makeText(this, "请先选择要删除的习惯", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // 从后往前删除，避免索引问题
+        selectedRows.sortedDescending().forEach { rowId ->
+            // 从视图中删除
+            tableContainer.removeView(tableContainer.findViewById(rowId))
+
+            // 从数据中删除
+            habitEntries.removeAll { it.id == rowId }
+
+            rowCount--
+        }
+
+        // 重新设置约束
+        resetConstraints()
+
+        // 更新SharedPreferences
+        saveHabitsToPrefs()
+
+        // 清空选择
+        selectedRows.clear()
+
+        Toast.makeText(this, "已删除${selectedRows.size}个习惯", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun resetConstraints() {
+        val constraintSet = ConstraintSet()
+        constraintSet.clone(tableContainer)
+
+        // 重新设置所有行的约束
+        for (i in 0 until tableContainer.childCount) {
+            val child = tableContainer.getChildAt(i)
+
+            if (i == 0) {
+                constraintSet.connect(child.id, ConstraintSet.TOP, tableContainer.id, ConstraintSet.TOP)
+            } else {
+                constraintSet.connect(child.id, ConstraintSet.TOP,
+                    tableContainer.getChildAt(i-1).id, ConstraintSet.BOTTOM)
+            }
+
+            constraintSet.connect(child.id, ConstraintSet.START, tableContainer.id, ConstraintSet.START)
+            constraintSet.connect(child.id, ConstraintSet.END, tableContainer.id, ConstraintSet.END)
+        }
+
+        constraintSet.applyTo(tableContainer)
+    }
+
+    private fun saveHabitsToPrefs() {
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+        val editor = prefs.edit()
+
+        // 清除旧数据
+        editor.clear()
+
+        // 保存新数据
+        editor.putInt(SharedPrefsConstants.KEY_HABIT_COUNT, habitEntries.size)
+
+        habitEntries.forEachIndexed { index, entry ->
+            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", entry.name)
+            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", entry.description)
+            entry.imageUri?.let {
+                editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString())
+            }
+        }
+
+        editor.apply()
     }
 
     // dp转px的扩展函数

@@ -29,18 +29,6 @@
         android:layout_marginTop="16dp"
         android:layout_marginStart="16dp" />
 
-
-    <Button
-        android:id="@+id/btn_add_habits"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Add"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        app:layout_constraintTop_toTopOf="@id/txt_habits"
-        app:layout_constraintBottom_toBottomOf="@id/txt_habits"
-        app:layout_constraintEnd_toStartOf="@id/btn_edit_habits"
-        android:layout_marginEnd="8dp" />
     <Button
         android:id="@+id/btn_edit"
         android:layout_width="wrap_content"
@@ -105,17 +93,6 @@
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginTop="24dp"
         android:layout_marginStart="16dp" />
-    <Button
-        android:id="@+id/btn_edit_habits"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Edit"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        app:layout_constraintTop_toTopOf="@id/txt_habits"
-        app:layout_constraintBottom_toBottomOf="@id/txt_habits"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginEnd="16dp" />
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/table_container"
         android:layout_width="0dp"

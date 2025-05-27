@@ -10,8 +10,12 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-
+private val PREFS_NAME = "HabitPrefs"
+private val KEY_HABIT_NAME = "habit_name"
+private val KEY_DESCRIPTION = "description"
+private val KEY_IMAGE_URI = "image_uri"
 class habitsActivity : AppCompatActivity() {
+    //初始化要保存的变量
     private lateinit var etHabitName: EditText
     private lateinit var etDescription: EditText
     private lateinit var ivHabitImage: ImageView
@@ -73,7 +77,14 @@ class habitsActivity : AppCompatActivity() {
             Toast.makeText(this, "Habit name cannot be empty!", Toast.LENGTH_SHORT).show()
             return
         }
-
+        //保存到变量
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs.edit().apply {
+            putString(KEY_HABIT_NAME, habitName)
+            putString(KEY_DESCRIPTION, description)
+            selectedImageUri?.let { putString(KEY_IMAGE_URI, it.toString()) }
+            apply()
+        }
         val resultIntent = Intent().apply {
             putExtra("habitName", habitName)
             putExtra("description", description)

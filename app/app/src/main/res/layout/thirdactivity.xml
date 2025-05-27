@@ -27,13 +27,13 @@
         android:paddingEnd="16dp"
         app:layout_constraintTop_toTopOf="@id/txt_habits"
         app:layout_constraintBottom_toBottomOf="@id/txt_habits"
-        app:layout_constraintEnd_toStartOf="@id/btn_edit_habits"
+        app:layout_constraintEnd_toStartOf="@id/btn_delete_habits"
         android:layout_marginEnd="8dp" />
     <Button
-        android:id="@+id/btn_edit_habits"
+        android:id="@+id/btn_delete_habits"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Edit"
+        android:text="Delete"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         app:layout_constraintTop_toTopOf="@id/txt_habits"
