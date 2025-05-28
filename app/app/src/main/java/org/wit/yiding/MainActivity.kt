@@ -20,6 +20,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.core.content.ContextCompat
+import android.net.Uri
+import android.widget.FrameLayout
+import android.widget.ImageView
 class MainActivity : AppCompatActivity() {
 
     private lateinit var txtLab: TextView
@@ -136,14 +139,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
     /**
-     * 向主界面添加单个习惯条目行
+     * 向主界面添加带图片显示功能的习惯条目行
      * @param habitName 习惯名称
      * @param description 习惯描述
      */
     private fun addHabitRowToMain(habitName: String, description: String) {
         val rowId = View.generateViewId()
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+        val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
+        var imageUri: Uri? = null
 
-        LinearLayout(this).apply {
+        // 查找当前习惯对应的图片URI
+        for (i in 0 until habitCount) {
+            if (prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") == habitName) {
+                val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
+                imageUri = uriString?.let { Uri.parse(it) }
+                break
+            }
+        }
+
+        // 创建行容器（水平布局）
+        val rowContainer = LinearLayout(this).apply {
             id = rowId
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -151,30 +167,81 @@ class MainActivity : AppCompatActivity() {
                 ConstraintLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
+                setMargins(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 0)
             }
-            // 添加边框背景
             background = ContextCompat.getDrawable(context, R.drawable.table_row_border)
-
-            // 添加左边距
-            setPadding(16.dpToPx(), 8.dpToPx(), 0, 8.dpToPx())
-            TextView(this@MainActivity).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply {
-                    gravity = Gravity.START
-                }
-                text = "$habitName: $description"
-                textSize = 16f
-                setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
-                addView(this)
-            }
-
-            tableContainer.addView(this)
+            setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
         }
 
+        // 文本部分（左侧）
+        TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply {
+                gravity = Gravity.START
+            }
+            text = "$habitName: $description"
+            textSize = 16f
+            setPadding(0, 0, 16.dpToPx(), 0)
+            rowContainer.addView(this)
+        }
+
+        // 图片部分（右侧）
+        val imageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                24.dpToPx(),
+                24.dpToPx()
+            ).apply {
+                marginEnd = 8.dpToPx()
+            }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            visibility = if (imageUri != null) View.VISIBLE else View.GONE
+
+            imageUri?.let { uri ->
+                setImageURI(uri)
+            } ?: run {
+                setImageResource(R.drawable.ic_default_image)
+            }
+
+            // 点击图片可以关闭
+            setOnClickListener {
+                visibility = View.GONE
+            }
+        }
+        rowContainer.addView(imageView)
+
+        // 图片显示控制按钮
+        val toggleBtn = TextView(this).apply {
+            text = if (imageUri != null) "" else "×"
+            textSize = 16f
+            setOnClickListener {
+                if (imageView.visibility == View.VISIBLE) {
+                    imageView.visibility = View.GONE
+                    text = ""
+                } else {
+                    imageView.visibility = View.VISIBLE
+                    text = "×"
+                }
+            }
+        }
+        rowContainer.addView(toggleBtn)
+
+        // 添加点击整行也可以切换图片显示
+        rowContainer.setOnClickListener {
+            if (imageView.visibility == View.VISIBLE) {
+                imageView.visibility = View.GONE
+                toggleBtn.text = ""
+            } else {
+                imageView.visibility = View.VISIBLE
+                toggleBtn.text = "×"
+            }
+        }
+
+        tableContainer.addView(rowContainer)
+
+        // 约束布局设置
         ConstraintSet().apply {
             clone(tableContainer)
             connect(
@@ -189,7 +256,6 @@ class MainActivity : AppCompatActivity() {
 
         rowCount++
     }
-
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     companion object {
