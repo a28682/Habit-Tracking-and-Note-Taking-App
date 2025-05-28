@@ -10,6 +10,8 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.io.File
+import java.io.FileOutputStream
 
 class habitsActivity : AppCompatActivity() {
     // 视图变量
@@ -98,13 +100,31 @@ class habitsActivity : AppCompatActivity() {
         Intent().apply {
             putExtra(EXTRA_IS_EDIT_MODE, isEditMode)
             if (isEditMode) {
-                putExtra(EXTRA_ORIGINAL_HABIT_ID, originalHabitId)  // 返回原始ID用于替换
+                putExtra(EXTRA_ORIGINAL_HABIT_ID, originalHabitId)
             }
             putExtra(EXTRA_HABIT_NAME, habitName)
             putExtra(EXTRA_DESCRIPTION, description)
-            selectedImageUri?.let { putExtra(EXTRA_IMAGE_URI, it.toString()) }
+
+            // 修改这里：将图片拷贝到应用私有存储后再保存URI
+            selectedImageUri?.let { uri ->
+                val copiedUri = copyImageToAppStorage(uri)
+                putExtra(EXTRA_IMAGE_URI, copiedUri.toString())
+            }
+
             setResult(Activity.RESULT_OK, this)
             finish()
         }
+    }
+
+    private fun copyImageToAppStorage(uri: Uri): Uri {
+        val inputStream = contentResolver.openInputStream(uri)
+        val file = File(filesDir, "images/${System.currentTimeMillis()}.jpg")
+        file.parentFile?.mkdirs()
+
+        FileOutputStream(file).use { output ->
+            inputStream?.copyTo(output)
+        }
+
+        return Uri.fromFile(file)
     }
 }

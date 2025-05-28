@@ -18,6 +18,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.content.SharedPreferences
+import android.util.Log
+
 object SharedPrefsConstants {
     const val PREFS_NAME = "HabitTrackerPrefs"  // SharedPreferences 文件名
     const val KEY_HABIT_COUNT = "habit_count"   // 存储习惯数量的键
@@ -108,19 +110,38 @@ class thirdActivity : AppCompatActivity() {
             startActivityForResult(intent, ADD_HABIT_REQUEST)
         }
     }
+
     private fun loadSavedHabits() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
 
         for (i in 0 until habitCount) {
-            val name = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") ?: ""
-            val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
-            val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
-            val uri = uriString?.let { Uri.parse(it) }
+            try {
+                val name = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") ?: ""
+                val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
+                val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
 
-            if (name.isNotEmpty()) {
-                addHabitRow(name, desc, uri)
+                // 添加URI有效性检查
+                val uri = uriString?.let {
+                    val uri = Uri.parse(it)
+                    if (isUriValid(uri)) uri else null
+                }
+
+                if (name.isNotEmpty()) {
+                    addHabitRow(name, desc, uri)
+                }
+            } catch (e: Exception) {
+                Log.e("HabitTracker", "Error loading habit $i", e)
             }
+        }
+    }
+
+    private fun isUriValid(uri: Uri): Boolean {
+        return try {
+            contentResolver.openInputStream(uri)?.close()
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 
