@@ -19,47 +19,51 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import android.content.SharedPreferences
 import android.util.Log
+import android.widget.Switch
+import java.lang.ref.WeakReference
 
 object SharedPrefsConstants {
-    const val PREFS_NAME = "HabitTrackerPrefs"  // SharedPreferences 文件名
-    const val KEY_HABIT_COUNT = "habit_count"   // 存储习惯数量的键
-    const val KEY_HABIT_PREFIX = "habit_"       // 习惯条目前缀
+    const val PREFS_NAME = "HabitTrackerPrefs"
+    const val KEY_HABIT_COUNT = "habit_count"
+    const val KEY_HABIT_PREFIX = "habit_"
 }
+
 class thirdActivity : AppCompatActivity() {
 
     private lateinit var tableContainer: ConstraintLayout
     private var rowCount = 0
-    private val selectedRows = mutableListOf<Int>() // 存储选中行的ID
-    private val habitEntries = mutableListOf<HabitEntry>() // 存储习惯条目
+    private val selectedRows = mutableListOf<Int>()
+    private val habitEntries = mutableListOf<HabitEntry>()
 
     companion object {
         const val ADD_HABIT_REQUEST = 1001
     }
 
-    // 内部数据类，存储习惯信息
     private data class HabitEntry(
         val id: Int,
         val name: String,
         val description: String,
-        val imageUri: Uri?
-    )
+        val imageUri: Uri?,
+        var isEnabled: Boolean = true,
+        var switchRef: WeakReference<Switch>? = null
+    ) {
+        override fun equals(other: Any?): Boolean = (other as? HabitEntry)?.id == id
+        override fun hashCode(): Int = id
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.thirdactivity)
 
-        // 处理边缘到边缘布局
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
 
-        // 初始化视图
         tableContainer = findViewById(R.id.table_container)
 
-        // 设置按钮点击事件
         findViewById<Button>(R.id.btn1).setOnClickListener {
             startActivity(Intent(this, MainActivity::class.java))
         }
@@ -69,45 +73,45 @@ class thirdActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn_add_habits).setOnClickListener {
-            val intent = Intent(this, habitsActivity::class.java)
-            startActivityForResult(intent, ADD_HABIT_REQUEST)
+            startActivityForResult(Intent(this, habitsActivity::class.java), ADD_HABIT_REQUEST)
         }
 
-        // 设置Delete按钮点击事件
         findViewById<Button>(R.id.btn_delete_habits).setOnClickListener {
             deleteSelectedHabits()
         }
-        findViewById<Button>(R.id.btn_edit_habits).setOnClickListener{
+
+        findViewById<Button>(R.id.btn_edit_habits).setOnClickListener {
             editHabits()
         }
-        // 加载已保存的习惯
+
         loadSavedHabits()
     }
+
+    override fun onResume() {
+        super.onResume()
+        refreshAllSwitchStates()
+    }
+
+    private fun refreshAllSwitchStates() {
+        habitEntries.forEach { entry ->
+            entry.switchRef?.get()?.isChecked = entry.isEnabled
+        }
+    }
+
     private fun editHabits() {
-        if (selectedRows.isEmpty()) {
-            Toast.makeText(this, "请先选择要编辑的习惯", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        if (selectedRows.size > 1) {
-            Toast.makeText(this, "一次只能编辑一个习惯", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val selectedRowId = selectedRows.first()
-        val habitEntry = habitEntries.firstOrNull { it.id == selectedRowId }
-
-        habitEntry?.let { entry ->
-            val intent = Intent(this, habitsActivity::class.java).apply {
-                putExtra(habitsActivity.EXTRA_IS_EDIT_MODE, true)
-                putExtra(habitsActivity.EXTRA_ORIGINAL_HABIT_ID, entry.id)  // 传递原始ID
-                putExtra(habitsActivity.EXTRA_HABIT_NAME, entry.name)
-                putExtra(habitsActivity.EXTRA_DESCRIPTION, entry.description)
-                entry.imageUri?.let { uri ->
-                    putExtra(habitsActivity.EXTRA_IMAGE_URI, uri.toString())
+        when {
+            selectedRows.isEmpty() -> Toast.makeText(this, "请先选择要编辑的习惯", Toast.LENGTH_SHORT).show()
+            selectedRows.size > 1 -> Toast.makeText(this, "一次只能编辑一个习惯", Toast.LENGTH_SHORT).show()
+            else -> habitEntries.firstOrNull { it.id == selectedRows.first() }?.let { entry ->
+                Intent(this, habitsActivity::class.java).apply {
+                    putExtra(habitsActivity.EXTRA_IS_EDIT_MODE, true)
+                    putExtra(habitsActivity.EXTRA_ORIGINAL_HABIT_ID, entry.id)
+                    putExtra(habitsActivity.EXTRA_HABIT_NAME, entry.name)
+                    putExtra(habitsActivity.EXTRA_DESCRIPTION, entry.description)
+                    entry.imageUri?.let { putExtra(habitsActivity.EXTRA_IMAGE_URI, it.toString()) }
+                    startActivityForResult(this, ADD_HABIT_REQUEST)
                 }
             }
-            startActivityForResult(intent, ADD_HABIT_REQUEST)
         }
     }
 
@@ -115,163 +119,161 @@ class thirdActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
 
-        for (i in 0 until habitCount) {
+        (0 until habitCount).forEach { i ->
             try {
                 val name = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") ?: ""
                 val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
+                val isEnabled = prefs.getBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled", true)
                 val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
+                val uri = uriString?.takeIf { isUriValid(Uri.parse(it)) }?.let { Uri.parse(it) }
 
-                // 添加URI有效性检查
-                val uri = uriString?.let {
-                    val uri = Uri.parse(it)
-                    if (isUriValid(uri)) uri else null
-                }
-
-                if (name.isNotEmpty()) {
-                    addHabitRow(name, desc, uri)
-                }
+                if (name.isNotEmpty()) addHabitRow(name, desc, uri, isEnabled)
             } catch (e: Exception) {
                 Log.e("HabitTracker", "Error loading habit $i", e)
             }
         }
     }
 
-    private fun isUriValid(uri: Uri): Boolean {
-        return try {
-            contentResolver.openInputStream(uri)?.close()
-            true
-        } catch (e: Exception) {
-            false
-        }
+    private fun isUriValid(uri: Uri): Boolean = try {
+        contentResolver.openInputStream(uri)?.close()
+        true
+    } catch (e: Exception) {
+        false
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == ADD_HABIT_REQUEST && resultCode == RESULT_OK) {
-            val isEdit = data?.getBooleanExtra(habitsActivity.EXTRA_IS_EDIT_MODE, false) ?: false
-            val originalId = data?.getIntExtra(habitsActivity.EXTRA_ORIGINAL_HABIT_ID, -1) ?: -1
+            data?.let {
+                val isEdit = it.getBooleanExtra(habitsActivity.EXTRA_IS_EDIT_MODE, false)
+                val originalId = it.getIntExtra(habitsActivity.EXTRA_ORIGINAL_HABIT_ID, -1)
+                val habitName = it.getStringExtra(habitsActivity.EXTRA_HABIT_NAME) ?: ""
+                val description = it.getStringExtra(habitsActivity.EXTRA_DESCRIPTION) ?: ""
+                val imageUri = it.getStringExtra(habitsActivity.EXTRA_IMAGE_URI)?.let { uri -> Uri.parse(uri) }
 
-            val habitName = data?.getStringExtra(habitsActivity.EXTRA_HABIT_NAME) ?: ""
-            val description = data?.getStringExtra(habitsActivity.EXTRA_DESCRIPTION) ?: ""
-            val imageUri = data?.getStringExtra(habitsActivity.EXTRA_IMAGE_URI)?.let { Uri.parse(it) }
-
-            if (isEdit && originalId != -1) {
-                // 替换原有习惯
-                val index = habitEntries.indexOfFirst { it.id == originalId }
-                if (index != -1) {
-                    // 保留原始ID，只更新内容
-                    habitEntries[index] = HabitEntry(originalId, habitName, description, imageUri)
-                    updateHabitRow(originalId, habitName, description, imageUri)
+                if (isEdit && originalId != -1) {
+                    habitEntries.indexOfFirst { it.id == originalId }.takeIf { it != -1 }?.let { index ->
+                        habitEntries[index] = HabitEntry(originalId, habitName, description, imageUri)
+                        updateHabitRow(originalId, habitName, description, imageUri)
+                    }
+                } else {
+                    addHabitRow(habitName, description, imageUri)
                 }
-            } else {
-                // 添加新习惯
-                addHabitRow(habitName, description, imageUri)
+                saveHabitsToPrefs()
+                selectedRows.clear()
             }
-            saveHabitsToPrefs()
-            selectedRows.clear()  // 清空选择
         }
     }
+
     private fun updateHabitRow(rowId: Int, habitName: String, description: String, imageUri: Uri?) {
         val row = tableContainer.findViewById<LinearLayout>(rowId)
         row?.let {
-            val textView = it.getChildAt(0) as TextView
-            textView.text = "$habitName: $description"
+            // 更新文本
+            (it.getChildAt(0) as? TextView)?.text = "$habitName: $description"
 
-            val imageView = it.getChildAt(1) as ImageView
-            imageUri?.let { uri ->
-                imageView.setImageURI(uri)
-            } ?: run {
-                imageView.setImageResource(R.drawable.ic_default_image)
+            // 更新图片
+            (it.getChildAt(1) as? ImageView)?.let { imageView ->
+                if (imageUri != null) {
+                    imageView.setImageURI(imageUri)
+                } else {
+                    // 确保R.drawable.ic_default_image资源存在
+                    imageView.setImageResource(R.drawable.ic_default_image)
+                }
+            }
+
+            // 更新开关状态
+            habitEntries.firstOrNull { it.id == rowId }?.let { entry ->
+                (it.getChildAt(2) as? Switch)?.let { switch ->
+                    switch.isChecked = entry.isEnabled
+                    entry.switchRef = WeakReference(switch)
+                }
             }
         }
     }
-    private fun addHabitRow(habitName: String, description: String, imageUri: Uri?) {
-        val rowId = View.generateViewId()
 
-        // 创建习惯条目对象
-        val entry = HabitEntry(rowId, habitName, description, imageUri)
+    private fun addHabitRow(habitName: String, description: String, imageUri: Uri?, isEnabled: Boolean = true) {
+        val rowId = View.generateViewId()
+        val entry = HabitEntry(rowId, habitName, description, imageUri, isEnabled)
         habitEntries.add(entry)
 
-        // 创建水平布局的行
-        val row = LinearLayout(this).apply {
+        LinearLayout(this).apply {
             id = rowId
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = ConstraintLayout.LayoutParams(
                 ConstraintLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 8.dpToPx(), 0, 8.dpToPx())
-            }
+            ).apply { setMargins(0, 8.dpToPx(), 0, 8.dpToPx()) }
             background = ContextCompat.getDrawable(context, R.drawable.row_background_unselected)
+            setOnClickListener { toggleRowSelection(rowId) }
 
-            // 设置点击事件
-            setOnClickListener {
-                toggleRowSelection(rowId)
+            // Text View
+            TextView(this@thirdActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    gravity = Gravity.START
+                }
+                text = "$habitName: $description"
+                textSize = 16f
+                setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
+                addView(this)
             }
+
+            // Image View
+            ImageView(this@thirdActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageURI(imageUri ?: run {
+                    setImageResource(R.drawable.ic_default_image)
+                    null
+                })
+                addView(this)
+            }
+
+            // Switch
+            Switch(this@thirdActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(16.dpToPx(), 0, 16.dpToPx(), 0) }
+                setSwitchTextAppearance(this@thirdActivity, R.style.SwitchStyle)
+                isChecked = isEnabled
+                entry.switchRef = WeakReference(this)
+
+                setOnCheckedChangeListener { _, isChecked ->
+                    entry.isEnabled = isChecked
+                    saveHabitsToPrefs()
+                    Toast.makeText(
+                        this@thirdActivity,
+                        "${entry.name} ${if (isChecked) "已启用" else "已禁用"}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                addView(this)
+            }
+
+            tableContainer.addView(this)
         }
 
-        // 左侧文本部分
-        val textView = TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f // 使用权重填满剩余空间
-            ).apply {
-                gravity = Gravity.START
-            }
-            text = "$habitName: $description"
-            textSize = 16f
-            setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
-        }
-
-        // 右侧图片部分
-        val imageView = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                48.dpToPx(),
-                48.dpToPx()
+        ConstraintSet().apply {
+            clone(tableContainer)
+            connect(rowId, ConstraintSet.TOP,
+                if (rowCount == 0) tableContainer.id else tableContainer.getChildAt(rowCount - 1).id,
+                if (rowCount == 0) ConstraintSet.TOP else ConstraintSet.BOTTOM
             )
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            imageUri?.let { uri ->
-                setImageURI(uri)
-            } ?: run {
-                setImageResource(R.drawable.ic_default_image) // 默认图片
-            }
+            connect(rowId, ConstraintSet.START, tableContainer.id, ConstraintSet.START)
+            connect(rowId, ConstraintSet.END, tableContainer.id, ConstraintSet.END)
+            applyTo(tableContainer)
         }
-
-        // 添加视图到行
-        row.addView(textView)
-        row.addView(imageView)
-        tableContainer.addView(row)
-
-        // 设置约束布局
-        val constraintSet = ConstraintSet()
-        constraintSet.clone(tableContainer)
-
-        // 根据是否是第一行设置不同的顶部约束
-        if (rowCount == 0) {
-            constraintSet.connect(rowId, ConstraintSet.TOP, tableContainer.id, ConstraintSet.TOP)
-        } else {
-            val prevRowId = tableContainer.getChildAt(rowCount - 1).id
-            constraintSet.connect(rowId, ConstraintSet.TOP, prevRowId, ConstraintSet.BOTTOM)
-        }
-
-        // 设置左右约束
-        constraintSet.connect(rowId, ConstraintSet.START, tableContainer.id, ConstraintSet.START)
-        constraintSet.connect(rowId, ConstraintSet.END, tableContainer.id, ConstraintSet.END)
-        constraintSet.applyTo(tableContainer)
 
         rowCount++
     }
 
     private fun toggleRowSelection(rowId: Int) {
         if (selectedRows.contains(rowId)) {
-            // 取消选中
             selectedRows.remove(rowId)
             tableContainer.findViewById<LinearLayout>(rowId)?.background =
                 ContextCompat.getDrawable(this, R.drawable.row_background_unselected)
         } else {
-            // 选中
             selectedRows.add(rowId)
             tableContainer.findViewById<LinearLayout>(rowId)?.background =
                 ContextCompat.getDrawable(this, R.drawable.row_background_selected)
@@ -284,72 +286,45 @@ class thirdActivity : AppCompatActivity() {
             return
         }
 
-        // 从后往前删除，避免索引问题
         selectedRows.sortedDescending().forEach { rowId ->
-            // 从视图中删除
             tableContainer.removeView(tableContainer.findViewById(rowId))
-
-            // 从数据中删除
             habitEntries.removeAll { it.id == rowId }
-
             rowCount--
         }
 
-        // 重新设置约束
         resetConstraints()
-
-        // 更新SharedPreferences
         saveHabitsToPrefs()
-
-        // 清空选择
         selectedRows.clear()
-
         Toast.makeText(this, "已删除${selectedRows.size}个习惯", Toast.LENGTH_SHORT).show()
     }
 
     private fun resetConstraints() {
-        val constraintSet = ConstraintSet()
-        constraintSet.clone(tableContainer)
-
-        // 重新设置所有行的约束
-        for (i in 0 until tableContainer.childCount) {
-            val child = tableContainer.getChildAt(i)
-
-            if (i == 0) {
-                constraintSet.connect(child.id, ConstraintSet.TOP, tableContainer.id, ConstraintSet.TOP)
-            } else {
-                constraintSet.connect(child.id, ConstraintSet.TOP,
-                    tableContainer.getChildAt(i-1).id, ConstraintSet.BOTTOM)
+        ConstraintSet().apply {
+            clone(tableContainer)
+            (0 until tableContainer.childCount).forEach { i ->
+                connect(tableContainer.getChildAt(i).id, ConstraintSet.TOP,
+                    if (i == 0) tableContainer.id else tableContainer.getChildAt(i - 1).id,
+                    if (i == 0) ConstraintSet.TOP else ConstraintSet.BOTTOM
+                )
+                connect(tableContainer.getChildAt(i).id, ConstraintSet.START, tableContainer.id, ConstraintSet.START)
+                connect(tableContainer.getChildAt(i).id, ConstraintSet.END, tableContainer.id, ConstraintSet.END)
             }
-
-            constraintSet.connect(child.id, ConstraintSet.START, tableContainer.id, ConstraintSet.START)
-            constraintSet.connect(child.id, ConstraintSet.END, tableContainer.id, ConstraintSet.END)
+            applyTo(tableContainer)
         }
-
-        constraintSet.applyTo(tableContainer)
     }
 
     private fun saveHabitsToPrefs() {
-        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
-        val editor = prefs.edit()
-
-        // 清除旧数据
-        editor.clear()
-
-        // 保存新数据
-        editor.putInt(SharedPrefsConstants.KEY_HABIT_COUNT, habitEntries.size)
-
-        habitEntries.forEachIndexed { index, entry ->
-            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", entry.name)
-            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", entry.description)
-            entry.imageUri?.let {
-                editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString())
+        getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE).edit().apply {
+            clear()
+            putInt(SharedPrefsConstants.KEY_HABIT_COUNT, habitEntries.size)
+            habitEntries.forEachIndexed { index, entry ->
+                putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", entry.name)
+                putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", entry.description)
+                putBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_enabled", entry.isEnabled)
+                entry.imageUri?.let { putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString()) }
             }
-        }
-
-        editor.apply()
+        }.apply()
     }
 
-    // dp转px的扩展函数
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 }
