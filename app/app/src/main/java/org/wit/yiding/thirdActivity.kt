@@ -31,6 +31,7 @@ class thirdActivity : AppCompatActivity() {
 
     companion object {
         const val ADD_HABIT_REQUEST = 1001
+        private const val TAG = "thirdActivity"
     }
 
     private data class HabitEntry(
@@ -56,6 +57,11 @@ class thirdActivity : AppCompatActivity() {
             insets
         }
 
+        initViews()
+        loadSavedHabits()
+    }
+
+    private fun initViews() {
         tableContainer = findViewById(R.id.table_container)
 
         findViewById<Button>(R.id.btn1).setOnClickListener {
@@ -77,8 +83,6 @@ class thirdActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_edit_habits).setOnClickListener {
             editHabits()
         }
-
-        loadSavedHabits()
     }
 
     override fun onResume() {
@@ -113,6 +117,10 @@ class thirdActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
 
+        tableContainer.removeAllViews()
+        habitEntries.clear()
+        rowCount = 0
+
         (0 until habitCount).forEach { i ->
             try {
                 val name = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") ?: ""
@@ -121,18 +129,13 @@ class thirdActivity : AppCompatActivity() {
                 val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
                 val uri = uriString?.let { Uri.parse(it) }
 
-                if (name.isNotEmpty()) addHabitRow(name, desc, uri, isEnabled)
+                if (name.isNotEmpty()) {
+                    addHabitRow(name, desc, uri, isEnabled)
+                }
             } catch (e: Exception) {
-                Log.e("HabitTracker", "Error loading habit $i", e)
+                Log.e(TAG, "Error loading habit $i", e)
             }
         }
-    }
-
-    private fun isUriValid(uri: Uri): Boolean = try {
-        contentResolver.openInputStream(uri)?.close()
-        true
-    } catch (e: Exception) {
-        false
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -146,10 +149,7 @@ class thirdActivity : AppCompatActivity() {
                 val imageUri = it.getStringExtra(habitsActivity.EXTRA_IMAGE_URI)?.let { uri -> Uri.parse(uri) }
 
                 if (isEdit && originalId != -1) {
-                    habitEntries.indexOfFirst { it.id == originalId }.takeIf { it != -1 }?.let { index ->
-                        habitEntries[index] = HabitEntry(originalId, habitName, description, imageUri)
-                        updateHabitRow(originalId, habitName, description, imageUri)
-                    }
+                    updateHabitEntry(originalId, habitName, description, imageUri)
                 } else {
                     addHabitRow(habitName, description, imageUri)
                 }
@@ -159,13 +159,20 @@ class thirdActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateHabitEntry(originalId: Int, name: String, desc: String, uri: Uri?) {
+        habitEntries.indexOfFirst { it.id == originalId }.takeIf { it != -1 }?.let { index ->
+            habitEntries[index] = HabitEntry(originalId, name, desc, uri, habitEntries[index].isEnabled)
+            updateHabitRow(originalId, name, desc, uri)
+        }
+    }
+
     private fun updateHabitRow(rowId: Int, habitName: String, description: String, imageUri: Uri?) {
         val row = tableContainer.findViewById<LinearLayout>(rowId)
         row?.let {
             (it.getChildAt(0) as? TextView)?.text = "$habitName: $description"
 
             (it.getChildAt(1) as? ImageView)?.let { imageView ->
-                if (imageUri != null) {
+                if (imageUri != null && isUriValid(imageUri)) {
                     imageView.setImageURI(imageUri)
                 } else {
                     imageView.setImageResource(R.drawable.ic_default_image)
@@ -181,7 +188,7 @@ class thirdActivity : AppCompatActivity() {
         }
     }
 
-    private fun addHabitRow(habitName: String, description: String, imageUri: Uri?, isEnabled: Boolean = false) {
+    private fun addHabitRow(habitName: String, description: String, imageUri: Uri?, isEnabled: Boolean = true) {
         val rowId = View.generateViewId()
         val entry = HabitEntry(rowId, habitName, description, imageUri, isEnabled)
         habitEntries.add(entry)
@@ -210,10 +217,11 @@ class thirdActivity : AppCompatActivity() {
             ImageView(this@thirdActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageURI(imageUri ?: run {
+                if (imageUri != null && isUriValid(imageUri)) {
+                    setImageURI(imageUri)
+                } else {
                     setImageResource(R.drawable.ic_default_image)
-                    null
-                })
+                }
                 addView(this)
             }
 
@@ -256,6 +264,14 @@ class thirdActivity : AppCompatActivity() {
         rowCount++
     }
 
+    private fun isUriValid(uri: Uri): Boolean = try {
+        contentResolver.openInputStream(uri)?.close()
+        true
+    } catch (e: Exception) {
+        Log.e(TAG, "Invalid URI: $uri", e)
+        false
+    }
+
     private fun toggleRowSelection(rowId: Int) {
         if (selectedRows.contains(rowId)) {
             selectedRows.remove(rowId)
@@ -282,15 +298,16 @@ class thirdActivity : AppCompatActivity() {
 
         resetConstraints()
         saveHabitsToPrefs()
-        selectedRows.clear()
         Toast.makeText(this, "已删除${selectedRows.size}个习惯", Toast.LENGTH_SHORT).show()
+        selectedRows.clear()
     }
 
     private fun resetConstraints() {
         ConstraintSet().apply {
             clone(tableContainer)
             (0 until tableContainer.childCount).forEach { i ->
-                connect(tableContainer.getChildAt(i).id, ConstraintSet.TOP,
+                connect(
+                    tableContainer.getChildAt(i).id, ConstraintSet.TOP,
                     if (i == 0) tableContainer.id else tableContainer.getChildAt(i - 1).id,
                     if (i == 0) ConstraintSet.TOP else ConstraintSet.BOTTOM
                 )
@@ -303,37 +320,61 @@ class thirdActivity : AppCompatActivity() {
 
     private fun saveHabitsToPrefs() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+        val editor = prefs.edit()
 
-        // 备份非习惯数据
+        // 1. 备份非习惯数据（包括MainActivity的可见性状态）
         val visibilityState = prefs.getString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, "{}") ?: "{}"
         val clicksData = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
 
-        // 只删除习惯相关键
+        // 2. 清除旧习惯数据（但保留其他键）
         val oldHabitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
-        val editor = prefs.edit()
-        for (i in 0 until oldHabitCount) {
+        (0 until oldHabitCount).forEach { i ->
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name")
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc")
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled")
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri")
         }
 
-        // 保存新习惯数据
+        // 3. 保存新习惯数据（带有效性检查）
         editor.putInt(SharedPrefsConstants.KEY_HABIT_COUNT, habitEntries.size)
         habitEntries.forEachIndexed { index, entry ->
-            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", entry.name)
-            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", entry.description)
-            editor.putBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_enabled", entry.isEnabled)
-            entry.imageUri?.let { editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString()) }
+            with(entry) {
+                editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", name)
+                editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", description)
+                editor.putBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_enabled", isEnabled)
+
+                // 关键修改：只保存有效的URI
+                imageUri?.takeIf { uri ->
+                    try {
+                        contentResolver.openInputStream(uri)?.close()
+                        true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Invalid URI: $uri", e)
+                        false
+                    }
+                }?.let {
+                    editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString())
+                }
+            }
         }
 
-        // 恢复非习惯数据
+        // 4. 恢复非习惯数据
         editor.putString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, visibilityState)
         editor.putString(SharedPrefsConstants.KEY_HABIT_CLICKS, clicksData)
 
-        editor.apply()
+        // 5. 使用commit()确保立即写入
+        editor.commit() // 关键修改：替换原来的apply()
 
-        Log.d("thirdActivity", "Saved ${habitEntries.size} habits, preserved visibility state")
+        Log.d(TAG, """
+            ====== Saved Habits Data ======
+            Count: ${habitEntries.size}
+            Names: ${habitEntries.map { it.name }}
+            Enabled: ${habitEntries.map { it.isEnabled }}
+            URIs: ${habitEntries.map { it.imageUri?.toString() }}
+            Preserved visibility state: ${!visibilityState.isNullOrEmpty()}
+        """.trimIndent())
+
+        // 通知MainActivity更新
         MainActivity.notifyHabitsUpdated(this)
     }
 

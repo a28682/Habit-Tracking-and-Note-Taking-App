@@ -35,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private var isEditing = false
     private var rowCount = 0
     private val habitVisibilityMap = mutableMapOf<String, Boolean>()
+    private var isStateRestored = false
 
     companion object {
         const val ACTION_HABIT_UPDATED = "org.wit.yiding.ACTION_HABIT_UPDATED"
@@ -70,7 +71,10 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupButtonListeners()
 
-        if (savedInstanceState == null) {
+        // 修改加载顺序
+        if (savedInstanceState != null) {
+            onRestoreInstanceState(savedInstanceState)
+        } else {
             loadHabitVisibilityStates()
         }
         loadAndDisplayHabits()
@@ -89,7 +93,8 @@ class MainActivity : AppCompatActivity() {
         savedMap?.let {
             habitVisibilityMap.clear()
             habitVisibilityMap.putAll(it)
-            Log.d("MainActivity", "Restored ${it.size} visibility states from instance state")
+            isStateRestored = true
+            Log.d("MainActivity", "Restored ${it.size} states from instance. Content: $it")
         }
     }
 
@@ -105,7 +110,10 @@ class MainActivity : AppCompatActivity() {
             habitChangeReceiver,
             IntentFilter(ACTION_HABIT_UPDATED)
         )
-        loadHabitVisibilityStates()
+        if (!isStateRestored) {
+            loadHabitVisibilityStates()
+        }
+        isStateRestored = false
         loadAndDisplayHabits()
     }
 
@@ -165,23 +173,47 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
+    private fun isUriValid(uri: Uri): Boolean {
+        return try {
+            contentResolver.openInputStream(uri)?.use { it.close() }
+            true
+        } catch (e: Exception) {
+            Log.e("MainActivity", "URI validation failed: ${e.message}")
+            false
+        }
+    }
     private fun addHabitRowToMain(habitName: String, description: String) {
         val rowId = View.generateViewId()
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
         var imageUri: Uri? = null
 
+        // 1. 查找关联的图片URI
         for (i in 0 until habitCount) {
             if (prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") == habitName) {
-                val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
-                imageUri = uriString?.let { Uri.parse(it) }
+                prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)?.let { uriString ->
+                    val uri = Uri.parse(uriString)
+                    if (isUriValid(uri)) {
+                        imageUri = uri
+                    } else {
+                        Log.w("MainActivity", "Invalid URI for habit: $habitName")
+                    }
+                }
                 break
             }
         }
 
+        // 2. 获取或初始化可见性状态
         val isImageVisible = habitVisibilityMap.getOrPut(habitName) { true }
 
+        Log.d("ROW_CREATION", """
+            Creating row for $habitName
+            Visibility state: $isImageVisible
+            Image URI: ${imageUri?.toString() ?: "null"}
+            Current map: $habitVisibilityMap
+        """.trimIndent())
+
+        // 3. 创建行容器
         val rowContainer = LinearLayout(this).apply {
             id = rowId
             orientation = LinearLayout.HORIZONTAL
@@ -196,6 +228,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
         }
 
+        // 4. 添加习惯名称和描述
         TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -210,6 +243,7 @@ class MainActivity : AppCompatActivity() {
             rowContainer.addView(this)
         }
 
+        // 5. 添加图片视图（关键修改部分）
         val imageView = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 24.dpToPx(),
@@ -218,12 +252,20 @@ class MainActivity : AppCompatActivity() {
                 marginEnd = 8.dpToPx()
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            visibility = if (isImageVisible && imageUri != null) View.VISIBLE else View.GONE
 
-            imageUri?.let { uri ->
-                setImageURI(uri)
-            } ?: run {
+            // 根据状态设置可见性
+            visibility = if (isImageVisible && imageUri != null) {
+                try {
+                    setImageURI(imageUri)
+                    View.VISIBLE
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Failed to load image for $habitName", e)
+                    setImageResource(R.drawable.ic_default_image)
+                    View.GONE
+                }
+            } else {
                 setImageResource(R.drawable.ic_default_image)
+                View.GONE
             }
 
             setOnClickListener {
@@ -232,6 +274,7 @@ class MainActivity : AppCompatActivity() {
         }
         rowContainer.addView(imageView)
 
+        // 6. 添加切换按钮
         val toggleBtn = TextView(this).apply {
             text = if (imageView.visibility == View.VISIBLE) "×" else ""
             textSize = 16f
@@ -242,6 +285,7 @@ class MainActivity : AppCompatActivity() {
         }
         rowContainer.addView(toggleBtn)
 
+        // 7. 设置行点击事件
         rowContainer.setOnClickListener {
             val newVisibility = imageView.visibility != View.VISIBLE
             imageView.visibility = if (newVisibility) View.VISIBLE else View.GONE
@@ -251,8 +295,10 @@ class MainActivity : AppCompatActivity() {
             recordHabitClick(habitName)
         }
 
+        // 8. 添加行到容器
         tableContainer.addView(rowContainer)
 
+        // 9. 设置约束布局
         ConstraintSet().apply {
             clone(tableContainer)
             connect(
@@ -298,7 +344,7 @@ class MainActivity : AppCompatActivity() {
                     habitVisibilityMap[key] = jsonObject.getBoolean(key)
                 }
             }
-            Log.d("MainActivity", "Loaded ${habitVisibilityMap.size} visibility states from prefs")
+            Log.d("MainActivity", "Loaded ${habitVisibilityMap.size} visibility states from prefs. Content: $habitVisibilityMap")
         } catch (e: Exception) {
             Log.e("MainActivity", "Error loading visibility states", e)
         }
@@ -307,17 +353,18 @@ class MainActivity : AppCompatActivity() {
     private fun saveHabitVisibilityStates() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         try {
-            val jsonObject = JSONObject().apply {
-                habitVisibilityMap.forEach { (key, value) ->
-                    put(key, value)
-                }
+            // 使用同步commit确保立即写入
+            prefs.edit().apply {
+                putString(SharedPrefsConstants.KEY_HABIT_VISIBILITY,
+                    JSONObject().apply {
+                        habitVisibilityMap.forEach { (k, v) -> put(k, v) }
+                    }.toString()
+                )
+                commit() // 关键修改：使用commit替代apply
             }
-            prefs.edit()
-                .putString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, jsonObject.toString())
-                .apply()
-            Log.d("MainActivity", "Saved ${habitVisibilityMap.size} visibility states to prefs")
+            Log.d("MainActivity", "Visibility states committed: $habitVisibilityMap")
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error saving visibility states", e)
+            Log.e("MainActivity", "Save failed", e)
         }
     }
 
