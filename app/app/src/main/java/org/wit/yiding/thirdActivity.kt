@@ -22,12 +22,6 @@ import android.util.Log
 import android.widget.Switch
 import java.lang.ref.WeakReference
 
-object SharedPrefsConstants {
-    const val PREFS_NAME = "HabitTrackerPrefs"
-    const val KEY_HABIT_COUNT = "habit_count"
-    const val KEY_HABIT_PREFIX = "habit_"
-}
-
 class thirdActivity : AppCompatActivity() {
 
     private lateinit var tableContainer: ConstraintLayout
@@ -125,7 +119,7 @@ class thirdActivity : AppCompatActivity() {
                 val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
                 val isEnabled = prefs.getBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled", true)
                 val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
-                val uri = uriString?.takeIf { isUriValid(Uri.parse(it)) }?.let { Uri.parse(it) }
+                val uri = uriString?.let { Uri.parse(it) }
 
                 if (name.isNotEmpty()) addHabitRow(name, desc, uri, isEnabled)
             } catch (e: Exception) {
@@ -168,20 +162,16 @@ class thirdActivity : AppCompatActivity() {
     private fun updateHabitRow(rowId: Int, habitName: String, description: String, imageUri: Uri?) {
         val row = tableContainer.findViewById<LinearLayout>(rowId)
         row?.let {
-            // 更新文本
             (it.getChildAt(0) as? TextView)?.text = "$habitName: $description"
 
-            // 更新图片
             (it.getChildAt(1) as? ImageView)?.let { imageView ->
                 if (imageUri != null) {
                     imageView.setImageURI(imageUri)
                 } else {
-                    // 确保R.drawable.ic_default_image资源存在
                     imageView.setImageResource(R.drawable.ic_default_image)
                 }
             }
 
-            // 更新开关状态
             habitEntries.firstOrNull { it.id == rowId }?.let { entry ->
                 (it.getChildAt(2) as? Switch)?.let { switch ->
                     switch.isChecked = entry.isEnabled
@@ -191,7 +181,7 @@ class thirdActivity : AppCompatActivity() {
         }
     }
 
-    private fun addHabitRow(habitName: String, description: String, imageUri: Uri?, isEnabled: Boolean = true) {
+    private fun addHabitRow(habitName: String, description: String, imageUri: Uri?, isEnabled: Boolean = false) {
         val rowId = View.generateViewId()
         val entry = HabitEntry(rowId, habitName, description, imageUri, isEnabled)
         habitEntries.add(entry)
@@ -207,7 +197,6 @@ class thirdActivity : AppCompatActivity() {
             background = ContextCompat.getDrawable(context, R.drawable.row_background_unselected)
             setOnClickListener { toggleRowSelection(rowId) }
 
-            // Text View
             TextView(this@thirdActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     gravity = Gravity.START
@@ -218,7 +207,6 @@ class thirdActivity : AppCompatActivity() {
                 addView(this)
             }
 
-            // Image View
             ImageView(this@thirdActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(48.dpToPx(), 48.dpToPx())
                 scaleType = ImageView.ScaleType.CENTER_CROP
@@ -229,7 +217,6 @@ class thirdActivity : AppCompatActivity() {
                 addView(this)
             }
 
-            // Switch
             Switch(this@thirdActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -256,7 +243,8 @@ class thirdActivity : AppCompatActivity() {
 
         ConstraintSet().apply {
             clone(tableContainer)
-            connect(rowId, ConstraintSet.TOP,
+            connect(
+                rowId, ConstraintSet.TOP,
                 if (rowCount == 0) tableContainer.id else tableContainer.getChildAt(rowCount - 1).id,
                 if (rowCount == 0) ConstraintSet.TOP else ConstraintSet.BOTTOM
             )
@@ -314,16 +302,39 @@ class thirdActivity : AppCompatActivity() {
     }
 
     private fun saveHabitsToPrefs() {
-        getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE).edit().apply {
-            clear()
-            putInt(SharedPrefsConstants.KEY_HABIT_COUNT, habitEntries.size)
-            habitEntries.forEachIndexed { index, entry ->
-                putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", entry.name)
-                putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", entry.description)
-                putBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_enabled", entry.isEnabled)
-                entry.imageUri?.let { putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString()) }
-            }
-        }.apply()
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+
+        // 备份非习惯数据
+        val visibilityState = prefs.getString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, "{}") ?: "{}"
+        val clicksData = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
+
+        // 只删除习惯相关键
+        val oldHabitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
+        val editor = prefs.edit()
+        for (i in 0 until oldHabitCount) {
+            editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name")
+            editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc")
+            editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled")
+            editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri")
+        }
+
+        // 保存新习惯数据
+        editor.putInt(SharedPrefsConstants.KEY_HABIT_COUNT, habitEntries.size)
+        habitEntries.forEachIndexed { index, entry ->
+            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", entry.name)
+            editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", entry.description)
+            editor.putBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_enabled", entry.isEnabled)
+            entry.imageUri?.let { editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString()) }
+        }
+
+        // 恢复非习惯数据
+        editor.putString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, visibilityState)
+        editor.putString(SharedPrefsConstants.KEY_HABIT_CLICKS, clicksData)
+
+        editor.apply()
+
+        Log.d("thirdActivity", "Saved ${habitEntries.size} habits, preserved visibility state")
+        MainActivity.notifyHabitsUpdated(this)
     }
 
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()

@@ -4,25 +4,28 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import androidx.core.content.ContextCompat
-import android.net.Uri
-import android.widget.FrameLayout
-import android.widget.ImageView
+import org.json.JSONArray
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.*
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var txtLab: TextView
@@ -31,9 +34,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tableContainer: ConstraintLayout
     private var isEditing = false
     private var rowCount = 0
-    /**
-     * 广播接收器：监听习惯数据更新通知
-     */
+    private val habitVisibilityMap = mutableMapOf<String, Boolean>()
+
+    companion object {
+        const val ACTION_HABIT_UPDATED = "org.wit.yiding.ACTION_HABIT_UPDATED"
+        const val KEY_HABIT_VISIBILITY = "habit_visibility"
+        private const val VISIBILITY_STATE_KEY = "visibility_state"
+
+        fun notifyHabitsUpdated(context: Context) {
+            LocalBroadcastManager.getInstance(context).sendBroadcast(
+                Intent(ACTION_HABIT_UPDATED)
+            )
+        }
+    }
+
     private val habitChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == ACTION_HABIT_UPDATED) {
@@ -55,29 +69,46 @@ class MainActivity : AppCompatActivity() {
 
         initViews()
         setupButtonListeners()
+
+        if (savedInstanceState == null) {
+            loadHabitVisibilityStates()
+        }
         loadAndDisplayHabits()
     }
-    /**
-     * Activity恢复可见时注册广播接收器并刷新数据
-     */
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putSerializable(VISIBILITY_STATE_KEY, HashMap(habitVisibilityMap))
+        Log.d("MainActivity", "Saved instance state with ${habitVisibilityMap.size} items")
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        @Suppress("UNCHECKED_CAST")
+        val savedMap = savedInstanceState.getSerializable(VISIBILITY_STATE_KEY) as? HashMap<String, Boolean>
+        savedMap?.let {
+            habitVisibilityMap.clear()
+            habitVisibilityMap.putAll(it)
+            Log.d("MainActivity", "Restored ${it.size} visibility states from instance state")
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        saveHabitVisibilityStates()
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(habitChangeReceiver)
+    }
+
     override fun onResume() {
         super.onResume()
         LocalBroadcastManager.getInstance(this).registerReceiver(
             habitChangeReceiver,
             IntentFilter(ACTION_HABIT_UPDATED)
         )
+        loadHabitVisibilityStates()
         loadAndDisplayHabits()
     }
-    /**
-     * Activity不可见时注销广播接收器
-     */
-    override fun onPause() {
-        super.onPause()
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(habitChangeReceiver)
-    }
-    /**
-     * 初始化所有界面控件引用
-     */
+
     private fun initViews() {
         txtLab = findViewById(R.id.txt_lab)
         txtHomework = findViewById(R.id.txt_homework)
@@ -101,9 +132,7 @@ class MainActivity : AppCompatActivity() {
             toggleEditMode()
         }
     }
-    /**
-     * 切换编辑/保存模式（控制文本框的可编辑状态）
-     */
+
     private fun toggleEditMode() {
         isEditing = !isEditing
         btnEdit.text = if (isEditing) "Save" else "Edit"
@@ -114,9 +143,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Changes saved", Toast.LENGTH_SHORT).show()
         }
     }
-    /**
-     * 从SharedPreferences加载习惯数据并显示在列表中
-     */
+
     private fun loadAndDisplayHabits() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
@@ -138,18 +165,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    /**
-     * 向主界面添加带图片显示功能的习惯条目行
-     * @param habitName 习惯名称
-     * @param description 习惯描述
-     */
+
     private fun addHabitRowToMain(habitName: String, description: String) {
         val rowId = View.generateViewId()
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
         var imageUri: Uri? = null
 
-        // 查找当前习惯对应的图片URI
         for (i in 0 until habitCount) {
             if (prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") == habitName) {
                 val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
@@ -158,7 +180,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 创建行容器（水平布局）
+        val isImageVisible = habitVisibilityMap.getOrPut(habitName) { true }
+
         val rowContainer = LinearLayout(this).apply {
             id = rowId
             orientation = LinearLayout.HORIZONTAL
@@ -173,7 +196,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(16.dpToPx(), 8.dpToPx(), 16.dpToPx(), 8.dpToPx())
         }
 
-        // 文本部分（左侧）
         TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -188,7 +210,6 @@ class MainActivity : AppCompatActivity() {
             rowContainer.addView(this)
         }
 
-        // 图片部分（右侧）
         val imageView = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 24.dpToPx(),
@@ -197,7 +218,7 @@ class MainActivity : AppCompatActivity() {
                 marginEnd = 8.dpToPx()
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
-            visibility = if (imageUri != null) View.VISIBLE else View.GONE
+            visibility = if (isImageVisible && imageUri != null) View.VISIBLE else View.GONE
 
             imageUri?.let { uri ->
                 setImageURI(uri)
@@ -205,43 +226,33 @@ class MainActivity : AppCompatActivity() {
                 setImageResource(R.drawable.ic_default_image)
             }
 
-            // 点击图片可以关闭
             setOnClickListener {
-                visibility = View.GONE
+                toggleHabitVisibility(habitName, this)
             }
         }
         rowContainer.addView(imageView)
 
-        // 图片显示控制按钮
         val toggleBtn = TextView(this).apply {
-            text = if (imageUri != null) "" else "×"
+            text = if (imageView.visibility == View.VISIBLE) "×" else ""
             textSize = 16f
             setOnClickListener {
-                if (imageView.visibility == View.VISIBLE) {
-                    imageView.visibility = View.GONE
-                    text = ""
-                } else {
-                    imageView.visibility = View.VISIBLE
-                    text = "×"
-                }
+                toggleHabitVisibility(habitName, imageView)
+                text = if (imageView.visibility == View.VISIBLE) "×" else ""
             }
         }
         rowContainer.addView(toggleBtn)
 
-        // 添加点击整行也可以切换图片显示
         rowContainer.setOnClickListener {
-            if (imageView.visibility == View.VISIBLE) {
-                imageView.visibility = View.GONE
-                toggleBtn.text = ""
-            } else {
-                imageView.visibility = View.VISIBLE
-                toggleBtn.text = "×"
-            }
+            val newVisibility = imageView.visibility != View.VISIBLE
+            imageView.visibility = if (newVisibility) View.VISIBLE else View.GONE
+            toggleBtn.text = if (newVisibility) "×" else ""
+            habitVisibilityMap[habitName] = newVisibility
+            saveHabitVisibilityStates()
+            recordHabitClick(habitName)
         }
 
         tableContainer.addView(rowContainer)
 
-        // 约束布局设置
         ConstraintSet().apply {
             clone(tableContainer)
             connect(
@@ -256,18 +267,81 @@ class MainActivity : AppCompatActivity() {
 
         rowCount++
     }
-    private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
-    companion object {
-        const val ACTION_HABIT_UPDATED = "org.wit.yiding.ACTION_HABIT_UPDATED"
-        /**
-         * 发送习惯数据更新广播
-         * @param context 上下文对象
-         */
-        fun notifyHabitsUpdated(context: Context) {
-            LocalBroadcastManager.getInstance(context).sendBroadcast(
-                Intent(ACTION_HABIT_UPDATED)
-            )
+    private fun toggleHabitVisibility(habitName: String, imageView: ImageView) {
+        val newVisibility = imageView.visibility != View.VISIBLE
+        imageView.visibility = if (newVisibility) View.VISIBLE else View.GONE
+        habitVisibilityMap[habitName] = newVisibility
+        saveHabitVisibilityStates()
+        Log.d("MainActivity", "Toggled visibility for $habitName to $newVisibility")
+    }
+
+    private fun loadHabitVisibilityStates() {
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+        try {
+            val jsonString = prefs.getString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, "{}") ?: "{}"
+            val jsonObject = JSONObject(jsonString)
+
+            val currentHabits = mutableSetOf<String>()
+            val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
+            for (i in 0 until habitCount) {
+                prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "")?.let {
+                    if (it.isNotEmpty()) currentHabits.add(it)
+                }
+            }
+
+            habitVisibilityMap.clear()
+            val keys = jsonObject.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                if (currentHabits.contains(key)) {
+                    habitVisibilityMap[key] = jsonObject.getBoolean(key)
+                }
+            }
+            Log.d("MainActivity", "Loaded ${habitVisibilityMap.size} visibility states from prefs")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error loading visibility states", e)
         }
     }
+
+    private fun saveHabitVisibilityStates() {
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+        try {
+            val jsonObject = JSONObject().apply {
+                habitVisibilityMap.forEach { (key, value) ->
+                    put(key, value)
+                }
+            }
+            prefs.edit()
+                .putString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, jsonObject.toString())
+                .apply()
+            Log.d("MainActivity", "Saved ${habitVisibilityMap.size} visibility states to prefs")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error saving visibility states", e)
+        }
+    }
+
+    private fun recordHabitClick(habitName: String) {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+
+        val clicksJson = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
+        val habitClicks = try {
+            JSONObject(clicksJson)
+        } catch (e: Exception) {
+            JSONObject()
+        }
+
+        val dateArray = habitClicks.optJSONArray(today) ?: JSONArray()
+        if (!dateArray.toString().contains(habitName)) {
+            dateArray.put(habitName)
+            habitClicks.put(today, dateArray)
+
+            prefs.edit()
+                .putString(SharedPrefsConstants.KEY_HABIT_CLICKS, habitClicks.toString())
+                .apply()
+        }
+    }
+
+    private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 }
