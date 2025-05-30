@@ -16,7 +16,4 @@ object SharedPrefsConstants {
     const val KEY_NOTE_COUNT = "note_count"
     const val KEY_NOTE_CLICKS = "note_clicks"
     const val KEY_COMPLETED_NOTES = "completed_notes"
-
-    // 其他可能需要的常量
-    const val KEY_LAST_SYNC_TIME = "last_sync_time" // 示例，可根据需要添加
 }

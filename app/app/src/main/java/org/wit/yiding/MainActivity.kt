@@ -203,9 +203,29 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleNoteCompletion(noteId: Int): Boolean {
         val isCompleted = !isNoteCompleted(noteId)
-        getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE).edit()
-            .putBoolean("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_completed", isCompleted)
-            .apply()
+        val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
+
+        // 1. 更新完成状态
+        prefs.edit().putBoolean("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_completed", isCompleted).apply()
+
+        // 2. 记录点击日期（新增）
+        if (isCompleted) {
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            val clicksJson = prefs.getString(SharedPrefsConstants.KEY_NOTE_CLICKS, "{}") ?: "{}"
+            val noteClicks = try {
+                JSONObject(clicksJson)
+            } catch (e: Exception) {
+                JSONObject()
+            }
+
+            val dateArray = noteClicks.optJSONArray(today) ?: JSONArray()
+            if (!dateArray.toString().contains(noteId.toString())) {
+                dateArray.put(noteId.toString())
+                noteClicks.put(today, dateArray)
+                prefs.edit().putString(SharedPrefsConstants.KEY_NOTE_CLICKS, noteClicks.toString()).apply()
+            }
+        }
+
         return isCompleted
     }
 
@@ -241,7 +261,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val isVisible = habitVisibilityMap.getOrDefault(name, true)
+        val isVisible = habitVisibilityMap.getOrDefault(name, false)
 
         val habitView = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(

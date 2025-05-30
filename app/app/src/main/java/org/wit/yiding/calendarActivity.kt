@@ -90,7 +90,7 @@ class calendarActivity : AppCompatActivity() {
                 result.append("\n")
             }
 
-            // 处理notes
+            // 处理笔记
             val noteClicks = JSONObject(noteClicksJson)
             val completedNotes = JSONObject(completedNotesJson)
 
@@ -102,12 +102,14 @@ class calendarActivity : AppCompatActivity() {
                 completedNoteSet.add(completedNotesArray.getString(i))
             }
 
+            // 笔记查询
             if (notesArray.length() > 0) {
                 result.append("笔记:\n")
                 for (i in 0 until notesArray.length()) {
                     val noteId = notesArray.getString(i)
                     val noteContent = prefs.getString("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_content", "未知笔记") ?: "未知笔记"
-                    result.append(if (completedNoteSet.contains(noteId)) "  ✓ $noteContent\n" else "  ○ $noteContent\n")
+                    val isCompleted = prefs.getBoolean("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_completed", false)
+                    result.append(if (isCompleted) "  ✓ $noteContent\n" else "  ○ $noteContent\n")
                 }
             }
 
