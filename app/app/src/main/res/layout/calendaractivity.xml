@@ -6,6 +6,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".calendarActivity">
+
+    <!-- 日历视图 -->
     <CalendarView
         android:id="@+id/calendarView"
         android:layout_width="0dp"
@@ -16,46 +18,71 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- 习惯显示区域 -->
     <TextView
         android:id="@+id/txtHabits"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
         android:padding="16dp"
         android:background="#F5F5F5"
         app:layout_constraintTop_toBottomOf="@+id/calendarView"
+        app:layout_constraintBottom_toTopOf="@+id/bottomNav"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- 底部导航栏 -->
     <LinearLayout
+        android:id="@+id/bottomNav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:padding="16dp"
         android:background="#F5F5F5"
+        android:orientation="horizontal"
+        android:padding="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent">
 
         <Button
             android:id="@+id/btn1"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="1"
-            android:layout_marginHorizontal="8dp"/>
+            android:layout_weight="1"
+            android:text="Home"
+            android:textSize="12sp"
+            style="@style/Widget.AppCompat.Button.Borderless"/>
 
         <Button
             android:id="@+id/btn2"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="2"
-            android:layout_marginHorizontal="8dp"/>
+            android:layout_weight="1"
+            android:text="Calendar"
+            android:textSize="12sp"
+            android:textColor="#6200EE"
+        style="@style/Widget.AppCompat.Button.Borderless"/>
 
         <Button
             android:id="@+id/btn3"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="3"
-            android:layout_marginHorizontal="8dp"/>
+            android:layout_weight="1"
+            android:text="Settings"
+            android:textSize="12sp"
+            style="@style/Widget.AppCompat.Button.Borderless"/>
+
+        <!-- 新增数据分析按钮 -->
+        <Button
+            android:id="@+id/btn4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Analytics"
+            android:textSize="12sp"
+            style="@style/Widget.AppCompat.Button.Borderless"/>
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

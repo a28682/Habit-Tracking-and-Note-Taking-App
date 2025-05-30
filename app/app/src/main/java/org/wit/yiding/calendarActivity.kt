@@ -52,26 +52,72 @@ class calendarActivity : AppCompatActivity() {
         }
     }
 
+
+
     private fun showHabitsForDate(date: String) {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
-        val clicksJson = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
+
+        // 获取习惯数据
+        val habitClicksJson = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
+        val completedHabitsJson = prefs.getString(SharedPrefsConstants.KEY_COMPLETED_HABITS, "{}") ?: "{}"
+
+        // 获取note数据
+        val noteClicksJson = prefs.getString(SharedPrefsConstants.KEY_NOTE_CLICKS, "{}") ?: "{}"
+        val completedNotesJson = prefs.getString(SharedPrefsConstants.KEY_COMPLETED_NOTES, "{}") ?: "{}"
+
+        val result = StringBuilder()
+        result.append("$date 的活动记录:\n\n")
 
         try {
-            val habitClicks = JSONObject(clicksJson)
+            // 处理习惯
+            val habitClicks = JSONObject(habitClicksJson)
+            val completedHabits = JSONObject(completedHabitsJson)
+
             val habitsArray = habitClicks.optJSONArray(date) ?: JSONArray()
+            val completedHabitsArray = completedHabits.optJSONArray(date) ?: JSONArray()
 
-            val habits = mutableListOf<String>()
-            for (i in 0 until habitsArray.length()) {
-                habits.add(habitsArray.getString(i))
+            val completedHabitSet = mutableSetOf<String>()
+            for (i in 0 until completedHabitsArray.length()) {
+                completedHabitSet.add(completedHabitsArray.getString(i))
             }
 
-            if (habits.isNotEmpty()) {
-                txtHabits.text = "$date 点击的习惯:\n${habits.joinToString("\n")}"
-            } else {
-                txtHabits.text = "$date 没有习惯点击记录"
+            if (habitsArray.length() > 0) {
+                result.append("习惯:\n")
+                for (i in 0 until habitsArray.length()) {
+                    val habitName = habitsArray.getString(i)
+                    result.append(if (completedHabitSet.contains(habitName)) "  ✓ $habitName\n" else "  ○ $habitName\n")
+                }
+                result.append("\n")
             }
+
+            // 处理notes
+            val noteClicks = JSONObject(noteClicksJson)
+            val completedNotes = JSONObject(completedNotesJson)
+
+            val notesArray = noteClicks.optJSONArray(date) ?: JSONArray()
+            val completedNotesArray = completedNotes.optJSONArray(date) ?: JSONArray()
+
+            val completedNoteSet = mutableSetOf<String>()
+            for (i in 0 until completedNotesArray.length()) {
+                completedNoteSet.add(completedNotesArray.getString(i))
+            }
+
+            if (notesArray.length() > 0) {
+                result.append("笔记:\n")
+                for (i in 0 until notesArray.length()) {
+                    val noteId = notesArray.getString(i)
+                    val noteContent = prefs.getString("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_content", "未知笔记") ?: "未知笔记"
+                    result.append(if (completedNoteSet.contains(noteId)) "  ✓ $noteContent\n" else "  ○ $noteContent\n")
+                }
+            }
+
+            if (habitsArray.length() == 0 && notesArray.length() == 0) {
+                result.append("当天没有活动记录")
+            }
+
+            txtHabits.text = result.toString()
         } catch (e: Exception) {
-            Log.e("calendarActivity", "Error parsing habit clicks", e)
+            Log.e("calendarActivity", "Error parsing data", e)
             txtHabits.text = "加载数据出错"
         }
     }
