@@ -41,7 +41,9 @@ class calendarActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn3).setOnClickListener {
             startActivity(Intent(this, thirdActivity::class.java))
         }
-
+        findViewById<Button>(R.id.btn4).setOnClickListener {
+            startActivity(Intent(this, AnalyticsActivity::class.java))
+        }
         calendarView.setOnDateChangeListener { _, year, month, dayOfMonth ->
             val selectedDate = Calendar.getInstance().apply {
                 set(year, month, dayOfMonth)

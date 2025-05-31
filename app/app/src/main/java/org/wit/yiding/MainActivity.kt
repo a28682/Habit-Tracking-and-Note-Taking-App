@@ -96,6 +96,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn3).setOnClickListener {
             startActivity(Intent(this, thirdActivity::class.java))
         }
+        findViewById<Button>(R.id.btn4).setOnClickListener {
+            startActivity(Intent(this, AnalyticsActivity::class.java))
+        }
     }
 
     private fun toggleEditMode() {
@@ -331,6 +334,7 @@ class MainActivity : AppCompatActivity() {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
 
+        // 获取当前点击记录
         val clicksJson = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
         val habitClicks = try {
             JSONObject(clicksJson)
@@ -338,11 +342,31 @@ class MainActivity : AppCompatActivity() {
             JSONObject()
         }
 
+        // 获取昨天的日期
+        val calendar = Calendar.getInstance()
+        calendar.add(Calendar.DAY_OF_YEAR, -1)
+        val yesterday = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
+
+        // 检查是否是连续点击
         val dateArray = habitClicks.optJSONArray(today) ?: JSONArray()
+        val yesterdayArray = habitClicks.optJSONArray(yesterday) ?: JSONArray()
+
+        // 如果昨天也点击了，则增加连续天数
+        val streakKey = "${SharedPrefsConstants.KEY_HABIT_STREAK_PREFIX}$habitName"
+        val currentStreak = prefs.getInt(streakKey, 0)
+
+        if (yesterdayArray.toString().contains(habitName)) {
+            // 连续点击，增加天数
+            prefs.edit().putInt(streakKey, currentStreak + 1).apply()
+        } else if (!dateArray.toString().contains(habitName)) {
+            // 新点击，重置为1天
+            prefs.edit().putInt(streakKey, 1).apply()
+        }
+
+        // 记录点击日期
         if (!dateArray.toString().contains(habitName)) {
             dateArray.put(habitName)
             habitClicks.put(today, dateArray)
-
             prefs.edit()
                 .putString(SharedPrefsConstants.KEY_HABIT_CLICKS, habitClicks.toString())
                 .apply()

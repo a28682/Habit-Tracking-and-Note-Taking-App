@@ -32,6 +32,7 @@ class thirdActivity : AppCompatActivity() {
     private val habitEntries = mutableListOf<HabitEntry>()
     private val allHabitEntries = mutableListOf<HabitEntry>() // 保存所有习惯用于搜索
 
+
     companion object {
         const val ADD_HABIT_REQUEST = 1001
         private const val TAG = "thirdActivity"
@@ -87,7 +88,9 @@ class thirdActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn2).setOnClickListener {
             startActivity(Intent(this, calendarActivity::class.java))
         }
-
+        findViewById<Button>(R.id.btn4).setOnClickListener {
+            startActivity(Intent(this, AnalyticsActivity::class.java))
+        }
         findViewById<Button>(R.id.btn_add_habits).setOnClickListener {
             startActivityForResult(Intent(this, habitsActivity::class.java), ADD_HABIT_REQUEST)
         }
