@@ -30,8 +30,7 @@ class thirdActivity : AppCompatActivity() {
     private var rowCount = 0
     private val selectedRows = mutableListOf<Int>()
     private val habitEntries = mutableListOf<HabitEntry>()
-    private val allHabitEntries = mutableListOf<HabitEntry>() // 保存所有习惯用于搜索
-
+    private val allHabitEntries = mutableListOf<HabitEntry>()
 
     companion object {
         const val ADD_HABIT_REQUEST = 1001
@@ -43,6 +42,7 @@ class thirdActivity : AppCompatActivity() {
         val name: String,
         val description: String,
         val imageUri: Uri?,
+        val steps: List<String>,
         var isEnabled: Boolean = true,
         var switchRef: WeakReference<Switch>? = null
     ) {
@@ -69,11 +69,8 @@ class thirdActivity : AppCompatActivity() {
         tableContainer = findViewById(R.id.table_container)
         searchView = findViewById(R.id.search_view)
 
-        // 设置搜索框监听器
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                return false
-            }
+            override fun onQueryTextSubmit(query: String?): Boolean = false
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 filterHabits(newText.orEmpty())
@@ -106,12 +103,10 @@ class thirdActivity : AppCompatActivity() {
 
     private fun filterHabits(query: String) {
         if (query.isEmpty()) {
-            // 搜索框为空，显示所有习惯
             habitEntries.clear()
             habitEntries.addAll(allHabitEntries)
             refreshTable()
         } else {
-            // 根据搜索条件过滤
             val filteredList = allHabitEntries.filter { entry ->
                 entry.name.contains(query, ignoreCase = true) ||
                         entry.description.contains(query, ignoreCase = true)
@@ -147,7 +142,10 @@ class thirdActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     gravity = Gravity.START
                 }
-                text = "${entry.name}: ${entry.description}"
+                val stepsText = if (entry.steps.isNotEmpty()) {
+                    "\n步骤:\n${entry.steps.joinToString("\n• ", "• ")}"
+                } else ""
+                text = "${entry.name}: ${entry.description}$stepsText"
                 textSize = 16f
                 setPadding(16.dpToPx(), 0, 16.dpToPx(), 0)
                 addView(this)
@@ -225,6 +223,7 @@ class thirdActivity : AppCompatActivity() {
                     putExtra(habitsActivity.EXTRA_HABIT_NAME, entry.name)
                     putExtra(habitsActivity.EXTRA_DESCRIPTION, entry.description)
                     entry.imageUri?.let { putExtra(habitsActivity.EXTRA_IMAGE_URI, it.toString()) }
+                    putStringArrayListExtra(habitsActivity.EXTRA_HABIT_STEPS, ArrayList(entry.steps))
                     startActivityForResult(this, ADD_HABIT_REQUEST)
                 }
             }
@@ -246,10 +245,11 @@ class thirdActivity : AppCompatActivity() {
                 val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
                 val isEnabled = prefs.getBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled", true)
                 val uriString = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)
+                val steps = prefs.getStringSet("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_steps", emptySet())?.toList() ?: emptyList()
                 val uri = uriString?.let { Uri.parse(it) }
 
                 if (name.isNotEmpty()) {
-                    val entry = HabitEntry(View.generateViewId(), name, desc, uri, isEnabled)
+                    val entry = HabitEntry(View.generateViewId(), name, desc, uri, steps, isEnabled)
                     allHabitEntries.add(entry)
                 }
             } catch (e: Exception) {
@@ -257,7 +257,6 @@ class thirdActivity : AppCompatActivity() {
             }
         }
 
-        // 初始显示所有习惯
         habitEntries.addAll(allHabitEntries)
         refreshTable()
     }
@@ -271,11 +270,12 @@ class thirdActivity : AppCompatActivity() {
                 val habitName = it.getStringExtra(habitsActivity.EXTRA_HABIT_NAME) ?: ""
                 val description = it.getStringExtra(habitsActivity.EXTRA_DESCRIPTION) ?: ""
                 val imageUri = it.getStringExtra(habitsActivity.EXTRA_IMAGE_URI)?.let { uri -> Uri.parse(uri) }
+                val steps = it.getStringArrayListExtra(habitsActivity.EXTRA_HABIT_STEPS) ?: emptyList()
 
                 if (isEdit && originalId != -1) {
-                    updateHabitEntry(originalId, habitName, description, imageUri)
+                    updateHabitEntry(originalId, habitName, description, imageUri, steps)
                 } else {
-                    val newEntry = HabitEntry(View.generateViewId(), habitName, description, imageUri)
+                    val newEntry = HabitEntry(View.generateViewId(), habitName, description, imageUri, steps)
                     allHabitEntries.add(newEntry)
                     habitEntries.add(newEntry)
                     addHabitRowToTable(newEntry)
@@ -286,29 +286,32 @@ class thirdActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateHabitEntry(originalId: Int, name: String, desc: String, uri: Uri?) {
-        // 更新allHabitEntries中的条目
+    private fun updateHabitEntry(originalId: Int, name: String, desc: String, uri: Uri?, steps: List<String>) {
         allHabitEntries.indexOfFirst { it.id == originalId }.takeIf { it != -1 }?.let { index ->
-            allHabitEntries[index] = HabitEntry(originalId, name, desc, uri, allHabitEntries[index].isEnabled)
+            allHabitEntries[index] = HabitEntry(originalId, name, desc, uri, steps, allHabitEntries[index].isEnabled)
         }
 
-        // 更新habitEntries中的条目（如果存在）
         habitEntries.indexOfFirst { it.id == originalId }.takeIf { it != -1 }?.let { index ->
-            habitEntries[index] = HabitEntry(originalId, name, desc, uri, habitEntries[index].isEnabled)
-            updateHabitRow(originalId, name, desc, uri)
+            habitEntries[index] = HabitEntry(originalId, name, desc, uri, steps, habitEntries[index].isEnabled)
+            updateHabitRow(originalId, name, desc, uri, steps)
         }
     }
 
-    private fun updateHabitRow(rowId: Int, habitName: String, description: String, imageUri: Uri?) {
+    private fun updateHabitRow(rowId: Int, habitName: String, description: String, imageUri: Uri?, steps: List<String>) {
         val row = tableContainer.findViewById<LinearLayout>(rowId)
         row?.let {
-            (it.getChildAt(0) as? TextView)?.text = "$habitName: $description"
+            (it.getChildAt(0) as? TextView)?.let { textView ->
+                val stepsText = if (steps.isNotEmpty()) {
+                    "\n步骤:\n${steps.joinToString("\n• ", "• ")}"
+                } else ""
+                textView.text = "$habitName: $description$stepsText"
+            }
 
             (it.getChildAt(1) as? ImageView)?.let { imageView ->
                 if (imageUri != null && isUriValid(imageUri)) {
-                    imageView.setImageURI(imageUri)  // 在 imageView 上调用 setImageURI
+                    imageView.setImageURI(imageUri)
                 } else {
-                    imageView.setImageResource(R.drawable.ic_default_image)  // 在 imageView 上调用 setImageResource
+                    imageView.setImageResource(R.drawable.ic_default_image)
                 }
             }
 
@@ -348,13 +351,8 @@ class thirdActivity : AppCompatActivity() {
         }
 
         selectedRows.sortedDescending().forEach { rowId ->
-            // 从allHabitEntries中删除
             allHabitEntries.removeAll { it.id == rowId }
-
-            // 从habitEntries中删除
             habitEntries.removeAll { it.id == rowId }
-
-            // 从视图中删除
             tableContainer.removeView(tableContainer.findViewById(rowId))
             rowCount--
         }
@@ -385,48 +383,35 @@ class thirdActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val editor = prefs.edit()
 
-        // 1. 备份非习惯数据
         val visibilityState = prefs.getString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, "{}") ?: "{}"
         val clicksData = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
 
-        // 2. 清除旧习惯数据
         val oldHabitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
         (0 until oldHabitCount).forEach { i ->
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name")
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc")
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled")
             editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri")
+            editor.remove("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_steps")
         }
 
-        // 3. 保存新习惯数据（基于allHabitEntries）
         editor.putInt(SharedPrefsConstants.KEY_HABIT_COUNT, allHabitEntries.size)
         allHabitEntries.forEachIndexed { index, entry ->
             with(entry) {
                 editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_name", name)
                 editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_desc", description)
                 editor.putBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_enabled", isEnabled)
-
-                imageUri?.takeIf { uri ->
-                    try {
-                        contentResolver.openInputStream(uri)?.close()
-                        true
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Invalid URI: $uri", e)
-                        false
-                    }
-                }?.let {
+                editor.putStringSet("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_steps", steps.toSet())
+                imageUri?.takeIf { uri -> isUriValid(uri) }?.let {
                     editor.putString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${index}_uri", it.toString())
                 }
             }
         }
 
-        // 4. 恢复非习惯数据
         editor.putString(SharedPrefsConstants.KEY_HABIT_VISIBILITY, visibilityState)
         editor.putString(SharedPrefsConstants.KEY_HABIT_CLICKS, clicksData)
 
-        editor.commit()
-
-        // 通知MainActivity更新
+        editor.apply()
         MainActivity.notifyHabitsUpdated(this)
     }
 

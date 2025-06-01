@@ -5,22 +5,25 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 import java.io.FileOutputStream
 
 class habitsActivity : AppCompatActivity() {
-    // 视图变量
     private lateinit var etHabitName: EditText
     private lateinit var etDescription: EditText
     private lateinit var ivHabitImage: ImageView
+    private lateinit var stepsContainer: LinearLayout
     private var selectedImageUri: Uri? = null
     private var isEditMode = false
-    private var originalHabitId = -1  // 原始习惯ID，用于编辑时识别
+    private var originalHabitId = -1
+    private val stepViews = mutableListOf<EditText>()
 
     companion object {
         const val PICK_IMAGE_REQUEST = 1002
@@ -30,6 +33,7 @@ class habitsActivity : AppCompatActivity() {
         const val EXTRA_HABIT_NAME = "habitName"
         const val EXTRA_DESCRIPTION = "description"
         const val EXTRA_IMAGE_URI = "imageUri"
+        const val EXTRA_HABIT_STEPS = "habitSteps"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,6 +49,8 @@ class habitsActivity : AppCompatActivity() {
         etHabitName = findViewById(R.id.etHabitName)
         etDescription = findViewById(R.id.etDescription)
         ivHabitImage = findViewById(R.id.ivHabitImage)
+        stepsContainer = findViewById(R.id.steps_container)
+        addStepView()
     }
 
     private fun checkEditMode() {
@@ -53,6 +59,11 @@ class habitsActivity : AppCompatActivity() {
             originalHabitId = intent.getIntExtra(EXTRA_ORIGINAL_HABIT_ID, -1)
             etHabitName.setText(intent.getStringExtra(EXTRA_HABIT_NAME))
             etDescription.setText(intent.getStringExtra(EXTRA_DESCRIPTION))
+
+            val steps = intent.getStringArrayListExtra(EXTRA_HABIT_STEPS)
+            steps?.forEach { step ->
+                addStepView(step)
+            }
 
             intent.getStringExtra(EXTRA_IMAGE_URI)?.let { uriString ->
                 selectedImageUri = Uri.parse(uriString)
@@ -68,6 +79,42 @@ class habitsActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             saveHabit()
+        }
+
+        findViewById<Button>(R.id.btnAddStep).setOnClickListener {
+            addStepView()
+        }
+
+        findViewById<Button>(R.id.btnDeleteStep).setOnClickListener {
+            removeStepView()
+        }
+    }
+
+    private fun addStepView(prefilledText: String = "") {
+        val stepView = EditText(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 8.dpToPx(), 0, 0)
+            }
+            hint = "步骤 ${stepViews.size + 1}"
+            textSize = 16f
+            setPadding(12.dpToPx(), 12.dpToPx(), 12.dpToPx(), 12.dpToPx())
+            setText(prefilledText)
+        }
+
+        stepsContainer.addView(stepView)
+        stepViews.add(stepView)
+    }
+
+    private fun removeStepView() {
+        if (stepViews.size > 1) {
+            val lastStep = stepViews.last()
+            stepsContainer.removeView(lastStep)
+            stepViews.removeAt(stepViews.size - 1)
+        } else {
+            Toast.makeText(this, "至少需要保留一个步骤", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -91,9 +138,15 @@ class habitsActivity : AppCompatActivity() {
     private fun saveHabit() {
         val habitName = etHabitName.text.toString().trim()
         val description = etDescription.text.toString().trim()
+        val steps = stepViews.map { it.text.toString().trim() }.filter { it.isNotEmpty() }
 
         if (habitName.isEmpty()) {
-            Toast.makeText(this, "Habit name cannot be empty!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "习惯名称不能为空!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (steps.isEmpty()) {
+            Toast.makeText(this, "请至少添加一个步骤", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -104,8 +157,8 @@ class habitsActivity : AppCompatActivity() {
             }
             putExtra(EXTRA_HABIT_NAME, habitName)
             putExtra(EXTRA_DESCRIPTION, description)
+            putStringArrayListExtra(EXTRA_HABIT_STEPS, ArrayList(steps))
 
-            // 修改这里：将图片拷贝到应用私有存储后再保存URI
             selectedImageUri?.let { uri ->
                 val copiedUri = copyImageToAppStorage(uri)
                 putExtra(EXTRA_IMAGE_URI, copiedUri.toString())
@@ -127,4 +180,6 @@ class habitsActivity : AppCompatActivity() {
 
         return Uri.fromFile(file)
     }
+
+    private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 }

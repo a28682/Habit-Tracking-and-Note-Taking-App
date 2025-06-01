@@ -30,6 +30,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var notesContainer: LinearLayout
@@ -240,16 +241,15 @@ class MainActivity : AppCompatActivity() {
 
         for (i in 0 until habitCount) {
             val name = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") ?: ""
-            val desc = prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_desc", "") ?: ""
             val isEnabled = prefs.getBoolean("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_enabled", false)
 
             if (isEnabled && name.isNotEmpty()) {
-                addHabitView(name, desc)
+                addHabitView(name)
             }
         }
     }
 
-    private fun addHabitView(name: String, description: String) {
+    private fun addHabitView(name: String) {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
         var imageUri: Uri? = null
@@ -279,14 +279,14 @@ class MainActivity : AppCompatActivity() {
             setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
         }
 
-        // Habit名称和描述
+        // Habit名称（移除了描述显示）
         TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
-            text = "$name: $description"
+            text = name // 只显示名称
             textSize = 16f
             habitView.addView(this)
         }
@@ -328,7 +328,6 @@ class MainActivity : AppCompatActivity() {
 
         habitsContainer.addView(habitView)
     }
-
 
     private fun recordHabitClick(habitName: String) {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())

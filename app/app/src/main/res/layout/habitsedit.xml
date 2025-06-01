@@ -5,11 +5,10 @@
     android:orientation="vertical"
     android:padding="24dp">
 
-
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Habit Name"
+        android:text="习惯名称"
         android:textSize="16sp"
         android:layout_marginBottom="8dp"/>
 
@@ -17,15 +16,14 @@
         android:id="@+id/etHabitName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter habit name"
+        android:hint="输入习惯名称"
         android:textSize="16sp"
         android:padding="12dp"/>
 
-    <!-- Description -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Description"
+        android:text="描述"
         android:textSize="16sp"
         android:layout_marginTop="16dp"
         android:layout_marginBottom="8dp"/>
@@ -34,20 +32,68 @@
         android:id="@+id/etDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Enter description"
+        android:hint="输入习惯描述"
         android:textSize="16sp"
         android:padding="12dp"
         android:minLines="3"/>
 
-    <!-- Upload Image Button -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="习惯步骤"
+            android:textSize="16sp"
+            android:layout_marginBottom="8dp"/>
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/btnAddStep"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="添加"
+            android:layout_marginLeft="8dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"/>
+
+        <Button
+            android:id="@+id/btnDeleteStep"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="删除"
+            android:layout_marginLeft="8dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/steps_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="8dp">
+    </LinearLayout>
+
     <Button
         android:id="@+id/btnUploadImage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Upload Image"
+        android:text="上传图片"
         android:layout_marginTop="24dp"/>
 
-    <!-- Image Preview -->
     <ImageView
         android:id="@+id/ivHabitImage"
         android:layout_width="match_parent"
@@ -55,13 +101,12 @@
         android:layout_marginTop="16dp"
         android:scaleType="centerCrop"
         android:background="#F5F5F5"
-        android:contentDescription="Habit image"/>
+        android:contentDescription="习惯图片"/>
 
-    <!-- Save Button -->
     <Button
         android:id="@+id/btnSave"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Save"
+        android:text="保存"
         android:layout_marginTop="24dp"/>
 </LinearLayout>
