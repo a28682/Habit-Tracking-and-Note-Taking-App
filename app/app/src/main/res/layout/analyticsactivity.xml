@@ -49,7 +49,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="习惯统计表"
+                android:text="Habit Tracker"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"/>
@@ -66,19 +66,18 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="习惯名称"
+                    android:text="Habits name"
                     android:textStyle="bold"/>
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="坚持天数"
+                    android:text="Habit Persistence"
                     android:textStyle="bold"
                     android:gravity="end"/>
             </LinearLayout>
 
-            <!-- 表格内容 -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recyclerViewTable"
                 android:layout_width="match_parent"
@@ -86,16 +85,14 @@
                 android:layout_marginBottom="24dp"
                 tools:listitem="@layout/item_table_row"/>
 
-            <!-- 柱状图标题 -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="习惯坚持天数分布"
+                android:text=""
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"/>
 
-            <!-- 横向柱状图容器 -->
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="300dp"
@@ -110,7 +107,6 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- 底部导航栏 -->
     <LinearLayout
         android:id="@+id/bottomNav"
         android:layout_width="match_parent"

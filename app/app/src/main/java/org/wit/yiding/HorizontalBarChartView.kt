@@ -24,13 +24,7 @@ class HorizontalBarChartView @JvmOverloads constructor(
     private var maxStreak: Int = 1
     private var showStreak: Boolean = true
 
-    fun setData(data: Map<String, Int>, showStreak: Boolean = true) {
-        this.data = data
-        this.showStreak = showStreak
-        this.maxStreak = data.values.maxOrNull() ?: 1
-        invalidate()
-    }
-
+//绘制图表
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (data.isEmpty()) return
@@ -40,20 +34,17 @@ class HorizontalBarChartView @JvmOverloads constructor(
         var startY = 80f
         val scale = (width - 200f) / maxStreak
 
-        // 绘制坐标轴
         canvas.drawLine(100f, 50f, 100f, startY + data.size * 80f, Paint().apply {
             color = Color.BLACK
             strokeWidth = 3f
         })
 
-        // 绘制标题
-        val title = if (showStreak) "习惯连续坚持天数" else "习惯总点击天数"
+        val title = if (showStreak) "Habit Persistence Days" else "Total Habit Tracking Days"
         canvas.drawText(title, 20f, 40f, textPaint.apply {
             textSize = 40f
             color = Color.DKGRAY
         })
 
-        // 绘制X轴标签
         canvas.drawText("0", 100f, startY + data.size * 80f + 30f, textPaint.apply {
             textSize = 28f
         })
@@ -62,12 +53,10 @@ class HorizontalBarChartView @JvmOverloads constructor(
         })
 
         data.forEach { (habitName, days) ->
-            // 绘制习惯名称
             canvas.drawText(habitName, 20f, startY + barHeight / 2 + 10, textPaint.apply {
                 textSize = 32f
             })
 
-            // 绘制柱状条
             val barLength = days * scale
             canvas.drawRect(
                 startX, startY,
@@ -75,9 +64,8 @@ class HorizontalBarChartView @JvmOverloads constructor(
                 barPaint
             )
 
-            // 绘制天数
             canvas.drawText(
-                "$days 天",
+                "$days day",
                 startX + barLength + 20f,
                 startY + barHeight / 2 + 10,
                 textPaint.apply { color = Color.DKGRAY }

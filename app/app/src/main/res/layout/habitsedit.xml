@@ -8,7 +8,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="习惯名称"
+        android:text="habit name"
         android:textSize="16sp"
         android:layout_marginBottom="8dp"/>
 
@@ -16,14 +16,14 @@
         android:id="@+id/etHabitName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="输入习惯名称"
+        android:hint="enter habit name"
         android:textSize="16sp"
         android:padding="12dp"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="描述"
+        android:text="Description"
         android:textSize="16sp"
         android:layout_marginTop="16dp"
         android:layout_marginBottom="8dp"/>
@@ -32,7 +32,7 @@
         android:id="@+id/etDescription"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="输入习惯描述"
+        android:hint="Enter habits description"
         android:textSize="16sp"
         android:padding="12dp"
         android:minLines="3"/>
@@ -47,7 +47,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="习惯步骤"
+            android:text="Habits steps"
             android:textSize="16sp"
             android:layout_marginBottom="8dp"/>
 
@@ -71,7 +71,7 @@
             android:id="@+id/btnDeleteStep"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="删除"
+            android:text="delete"
             android:layout_marginLeft="8dp"
             android:minWidth="0dp"
             android:minHeight="0dp"
@@ -91,7 +91,7 @@
         android:id="@+id/btnUploadImage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="上传图片"
+        android:text="upload image"
         android:layout_marginTop="24dp"/>
 
     <ImageView
@@ -107,6 +107,6 @@
         android:id="@+id/btnSave"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="保存"
+        android:text="Save"
         android:layout_marginTop="24dp"/>
 </LinearLayout>

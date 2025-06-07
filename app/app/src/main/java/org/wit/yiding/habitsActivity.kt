@@ -27,7 +27,6 @@ class habitsActivity : AppCompatActivity() {
 
     companion object {
         const val PICK_IMAGE_REQUEST = 1002
-        const val ADD_HABIT_REQUEST = 1001
         const val EXTRA_IS_EDIT_MODE = "isEditMode"
         const val EXTRA_ORIGINAL_HABIT_ID = "originalHabitId"
         const val EXTRA_HABIT_NAME = "habitName"
@@ -45,6 +44,7 @@ class habitsActivity : AppCompatActivity() {
         setupButtonListeners()
     }
 
+    // 初始化所有视图组件
     private fun initViews() {
         etHabitName = findViewById(R.id.etHabitName)
         etDescription = findViewById(R.id.etDescription)
@@ -53,6 +53,7 @@ class habitsActivity : AppCompatActivity() {
         addStepView()
     }
 
+    // 检查是否为编辑模式并加载相应数据
     private fun checkEditMode() {
         isEditMode = intent.getBooleanExtra(EXTRA_IS_EDIT_MODE, false)
         if (isEditMode) {
@@ -72,6 +73,7 @@ class habitsActivity : AppCompatActivity() {
         }
     }
 
+    // 设置所有按钮的点击事件监听
     private fun setupButtonListeners() {
         findViewById<Button>(R.id.btnUploadImage).setOnClickListener {
             openImageChooser()
@@ -90,6 +92,7 @@ class habitsActivity : AppCompatActivity() {
         }
     }
 
+    // 添加一个新的步骤输入框
     private fun addStepView(prefilledText: String = "") {
         val stepView = EditText(this).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -108,16 +111,18 @@ class habitsActivity : AppCompatActivity() {
         stepViews.add(stepView)
     }
 
+    // 移除最后一个步骤输入框
     private fun removeStepView() {
         if (stepViews.size > 1) {
             val lastStep = stepViews.last()
             stepsContainer.removeView(lastStep)
             stepViews.removeAt(stepViews.size - 1)
         } else {
-            Toast.makeText(this, "至少需要保留一个步骤", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "save one step at least", Toast.LENGTH_SHORT).show()
         }
     }
 
+    // 打开系统图片选择器
     private fun openImageChooser() {
         Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
             type = "image/*"
@@ -135,6 +140,7 @@ class habitsActivity : AppCompatActivity() {
         }
     }
 
+    // 保存习惯数据并返回结果
     private fun saveHabit() {
         val habitName = etHabitName.text.toString().trim()
         val description = etDescription.text.toString().trim()
@@ -169,6 +175,7 @@ class habitsActivity : AppCompatActivity() {
         }
     }
 
+    // 将图片复制到应用私有存储
     private fun copyImageToAppStorage(uri: Uri): Uri {
         val inputStream = contentResolver.openInputStream(uri)
         val file = File(filesDir, "images/${System.currentTimeMillis()}.jpg")

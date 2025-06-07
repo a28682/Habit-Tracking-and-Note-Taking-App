@@ -1,7 +1,6 @@
 package org.wit.yiding
 
 object SharedPrefsConstants {
-    // 共享首选项文件名
     const val PREFS_NAME = "HabitTrackerPrefs"
 
     // 习惯相关
@@ -9,7 +8,7 @@ object SharedPrefsConstants {
     const val KEY_HABIT_PREFIX = "habit_"
     const val KEY_HABIT_CLICKS = "habit_clicks"
     const val KEY_HABIT_VISIBILITY = "habit_visibility"
-    const val KEY_COMPLETED_HABITS = "completed_habits" // 新增
+    const val KEY_COMPLETED_HABITS = "completed_habits"
 
     // 笔记相关
     const val KEY_NOTE_PREFIX = "note_"

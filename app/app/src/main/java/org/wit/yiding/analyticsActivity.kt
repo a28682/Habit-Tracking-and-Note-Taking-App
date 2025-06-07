@@ -31,8 +31,6 @@ class AnalyticsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.analyticsactivity)
         sharedPrefs = getSharedPreferences("HabitPrefs", MODE_PRIVATE)
-
-        // 初始化所有视图
         scrollView = findViewById(R.id.scrollView)
         refreshHeader = findViewById(R.id.refreshHeader)
         refreshText = findViewById(R.id.refreshText)
@@ -49,7 +47,7 @@ class AnalyticsActivity : AppCompatActivity() {
             when {
                 scrollY < -150 && !isRefreshing -> startRefresh()
                 scrollY < -30 && !isRefreshing -> {
-                    refreshText?.text = "松开刷新"
+                    refreshText?.text = ""
                     refreshHeader?.visibility = View.VISIBLE
                 }
                 scrollY >= 0 -> refreshHeader?.visibility = View.GONE
@@ -76,22 +74,22 @@ class AnalyticsActivity : AppCompatActivity() {
         }
     }
 
+    // 初始化并显示数据
     private fun initData() {
         val habitStreaks = getHabitStreakData()
         val habitClicks = getHabitClickDaysData()
 
-        // 设置表格数据
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewTable)
         recyclerView?.layoutManager = LinearLayoutManager(this)
         recyclerView?.adapter = HabitAdapter(habitStreaks.map { (name, streak) ->
-            Habit(name, "$streak 天", habitClicks[name] ?: 0)
+            Habit(name, "$streak day", habitClicks[name] ?: 0)
         })
 
-        // 设置柱状图数据
         val chartView = findViewById<HorizontalBarChartView>(R.id.barChartView)
         chartView?.setData(habitClicks)
     }
 
+    // 获取习惯连续天数数据
     private fun getHabitStreakData(): Map<String, Int> {
         val sharedPrefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = sharedPrefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
@@ -107,6 +105,7 @@ class AnalyticsActivity : AppCompatActivity() {
         return streaks
     }
 
+    // 获取习惯点击天数数据
     private fun getHabitClickDaysData(): Map<String, Int> {
         val sharedPrefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val json = sharedPrefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
@@ -139,9 +138,7 @@ class AnalyticsActivity : AppCompatActivity() {
         }
         return result
     }
-
     data class Habit(val name: String, val streak: String, val totalDays: Int)
-
     private fun startRefresh() {
         isRefreshing = true
         refreshText?.text = "正在刷新..."
@@ -157,6 +154,7 @@ class AnalyticsActivity : AppCompatActivity() {
         }, 1500)
     }
 
+    // 加载数据
     private fun loadData() {
         initData()
         Toast.makeText(this, "数据已刷新", Toast.LENGTH_SHORT).show()
@@ -199,17 +197,18 @@ class AnalyticsActivity : AppCompatActivity() {
             val totalDaysView: TextView = view.findViewById(R.id.tvTotalDays)
         }
 
+        // 创建视图
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_table_row, parent, false)
             return ViewHolder(view)
         }
 
+        // 数据
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = habits[position]
             holder.nameView.text = item.name
-
-            holder.totalDaysView.text = "总计: ${item.totalDays}天"
+            holder.totalDaysView.text = "Total: ${item.totalDays}day"
         }
 
         override fun getItemCount() = habits.size
@@ -231,11 +230,13 @@ class AnalyticsActivity : AppCompatActivity() {
         }
         private var data: Map<String, Int> = emptyMap()
 
+        // 设置图表数据
         fun setData(data: Map<String, Int>) {
             this.data = data
             invalidate()
         }
 
+        // 绘制图表
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             if (data.isEmpty()) return
@@ -246,25 +247,22 @@ class AnalyticsActivity : AppCompatActivity() {
             val maxValue = data.values.maxOrNull() ?: 1
             val scale = (width - 200f) / maxValue
 
-            // 绘制坐标轴
             canvas.drawLine(100f, 50f, 100f, startY + data.size * 80f, Paint().apply {
                 color = Color.BLACK
                 strokeWidth = 3f
             })
 
-            // 绘制标题
-            canvas.drawText("习惯点击天数统计", 20f, 40f, textPaint.apply {
+            canvas.drawText("Total Habit Tracking Days", 20f, 40f, textPaint.apply {
                 textSize = 40f
                 color = Color.DKGRAY
             })
 
             data.forEach { (habitName, days) ->
-                // 绘制习惯名称
+
                 canvas.drawText(habitName, 20f, startY + barHeight / 2 + 10, textPaint.apply {
                     textSize = 32f
                 })
 
-                // 绘制柱状条
                 val barLength = days * scale
                 canvas.drawRect(
                     startX, startY,
@@ -272,9 +270,8 @@ class AnalyticsActivity : AppCompatActivity() {
                     barPaint
                 )
 
-                // 绘制天数
                 canvas.drawText(
-                    "$days 天",
+                    "$days day",
                     startX + barLength + 20f,
                     startY + barHeight / 2 + 10,
                     textPaint.apply { color = Color.DKGRAY }
@@ -284,6 +281,7 @@ class AnalyticsActivity : AppCompatActivity() {
             }
         }
 
+        // 测量视图大小
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             setMeasuredDimension(

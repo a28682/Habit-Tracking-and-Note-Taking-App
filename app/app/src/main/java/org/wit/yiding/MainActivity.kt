@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_HABIT_UPDATED = "org.wit.yiding.ACTION_HABIT_UPDATED"
         const val KEY_HABIT_VISIBILITY = "habit_visibility"
 
+        // 通知习惯更新
         fun notifyHabitsUpdated(context: Context) {
             LocalBroadcastManager.getInstance(context).sendBroadcast(
                 Intent(ACTION_HABIT_UPDATED)
@@ -70,6 +71,7 @@ class MainActivity : AppCompatActivity() {
         loadAndDisplayHabits()
     }
 
+    // 初始化视图组件
     private fun initViews() {
         notesContainer = findViewById(R.id.notes_container)
         habitsContainer = findViewById(R.id.habits_list)
@@ -77,6 +79,7 @@ class MainActivity : AppCompatActivity() {
         btnEdit = findViewById(R.id.btn_edit)
     }
 
+    // 设置按钮点击事件监听器
     private fun setupButtonListeners() {
         btnAdd.setOnClickListener {
             showAddNoteDialog()
@@ -87,7 +90,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<Button>(R.id.btn1).setOnClickListener {
-            // Already on home page
         }
 
         findViewById<Button>(R.id.btn2).setOnClickListener {
@@ -105,9 +107,9 @@ class MainActivity : AppCompatActivity() {
     private fun toggleEditMode() {
         isEditing = !isEditing
         btnEdit.text = if (isEditing) "Save" else "Edit"
-        // 这里可以添加其他编辑模式下的逻辑
     }
 
+    // 显示添加笔记对话框
     private fun showAddNoteDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_note, null)
         val editTextNote = dialogView.findViewById<EditText>(R.id.editTextNote)
@@ -126,6 +128,7 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    // 保存新笔记到SharedPreferences
     private fun saveNewNote(content: String) {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val noteCount = prefs.getInt(SharedPrefsConstants.KEY_NOTE_COUNT, 0)
@@ -138,6 +141,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 从SharedPreferences加载并显示所有笔记
     private fun loadAndDisplayNotes() {
         notesContainer.removeAllViews()
 
@@ -152,6 +156,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 添加单个笔记视图到容器
     private fun addNoteView(content: String, noteId: Int) {
         val isCompleted = isNoteCompleted(noteId)
 
@@ -168,7 +173,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
         }
 
-        // Note内容
         TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -184,7 +188,6 @@ class MainActivity : AppCompatActivity() {
             noteView.addView(this)
         }
 
-        // 完成状态按钮
         TextView(this).apply {
             text = if (isCompleted) "✓" else "○"
             textSize = 18f
@@ -194,25 +197,25 @@ class MainActivity : AppCompatActivity() {
 
         noteView.setOnClickListener {
             val completed = toggleNoteCompletion(noteId)
-            loadAndDisplayNotes() // 刷新列表
+            loadAndDisplayNotes()
         }
 
         notesContainer.addView(noteView)
     }
 
+    // 检查笔记是否已完成
     private fun isNoteCompleted(noteId: Int): Boolean {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         return prefs.getBoolean("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_completed", false)
     }
 
+    // 切换笔记完成状态并记录点击日期
     private fun toggleNoteCompletion(noteId: Int): Boolean {
         val isCompleted = !isNoteCompleted(noteId)
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
 
-        // 1. 更新完成状态
         prefs.edit().putBoolean("${SharedPrefsConstants.KEY_NOTE_PREFIX}${noteId}_completed", isCompleted).apply()
 
-        // 2. 记录点击日期（新增）
         if (isCompleted) {
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val clicksJson = prefs.getString(SharedPrefsConstants.KEY_NOTE_CLICKS, "{}") ?: "{}"
@@ -233,6 +236,7 @@ class MainActivity : AppCompatActivity() {
         return isCompleted
     }
 
+    // 加载并显示所有习惯
     private fun loadAndDisplayHabits() {
         habitsContainer.removeAllViews()
 
@@ -249,12 +253,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 添加单个习惯视图到容器
     private fun addHabitView(name: String) {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         val habitCount = prefs.getInt(SharedPrefsConstants.KEY_HABIT_COUNT, 0)
         var imageUri: Uri? = null
 
-        // 1. 查找关联的图片URI
         for (i in 0 until habitCount) {
             if (prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_name", "") == name) {
                 prefs.getString("${SharedPrefsConstants.KEY_HABIT_PREFIX}${i}_uri", null)?.let { uriString ->
@@ -279,19 +283,17 @@ class MainActivity : AppCompatActivity() {
             setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
         }
 
-        // Habit名称（移除了描述显示）
         TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
-            text = name // 只显示名称
+            text = name
             textSize = 16f
             habitView.addView(this)
         }
 
-        // 状态指示器（修改为URI加载）
         ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 24.dpToPx(),
@@ -301,7 +303,6 @@ class MainActivity : AppCompatActivity() {
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
 
-            // 根据URI加载图片或使用默认图标
             if (isVisible && imageUri != null) {
                 try {
                     setImageURI(imageUri)
@@ -322,18 +323,18 @@ class MainActivity : AppCompatActivity() {
             val newVisibility = !isVisible
             habitVisibilityMap[name] = newVisibility
             saveHabitVisibilityStates()
-            loadAndDisplayHabits() // 刷新列表
-            recordHabitClick(name) // 添加点击记录（需实现）
+            loadAndDisplayHabits()
+            recordHabitClick(name)
         }
 
         habitsContainer.addView(habitView)
     }
 
+    // 记录习惯点击并计算连续天数
     private fun recordHabitClick(habitName: String) {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
 
-        // 获取当前点击记录
         val clicksJson = prefs.getString(SharedPrefsConstants.KEY_HABIT_CLICKS, "{}") ?: "{}"
         val habitClicks = try {
             JSONObject(clicksJson)
@@ -341,28 +342,22 @@ class MainActivity : AppCompatActivity() {
             JSONObject()
         }
 
-        // 获取昨天的日期
         val calendar = Calendar.getInstance()
         calendar.add(Calendar.DAY_OF_YEAR, -1)
         val yesterday = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
 
-        // 检查是否是连续点击
         val dateArray = habitClicks.optJSONArray(today) ?: JSONArray()
         val yesterdayArray = habitClicks.optJSONArray(yesterday) ?: JSONArray()
 
-        // 如果昨天也点击了，则增加连续天数
         val streakKey = "${SharedPrefsConstants.KEY_HABIT_STREAK_PREFIX}$habitName"
         val currentStreak = prefs.getInt(streakKey, 0)
 
         if (yesterdayArray.toString().contains(habitName)) {
-            // 连续点击，增加天数
             prefs.edit().putInt(streakKey, currentStreak + 1).apply()
         } else if (!dateArray.toString().contains(habitName)) {
-            // 新点击，重置为1天
             prefs.edit().putInt(streakKey, 1).apply()
         }
 
-        // 记录点击日期
         if (!dateArray.toString().contains(habitName)) {
             dateArray.put(habitName)
             habitClicks.put(today, dateArray)
@@ -372,6 +367,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 从SharedPreferences加载习惯可见性状态
     private fun loadHabitVisibilityStates() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         try {
@@ -399,6 +395,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 保存习惯可见性状态到SharedPreferences
     private fun saveHabitVisibilityStates() {
         val prefs = getSharedPreferences(SharedPrefsConstants.PREFS_NAME, MODE_PRIVATE)
         try {

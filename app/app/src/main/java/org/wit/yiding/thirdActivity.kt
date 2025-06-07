@@ -176,7 +176,7 @@ class thirdActivity : AppCompatActivity() {
                     saveHabitsToPrefs()
                     Toast.makeText(
                         this@thirdActivity,
-                        "${entry.name} ${if (isChecked) "已启用" else "已禁用"}",
+                        "${entry.name} ${if (isChecked) "enable" else "disable"}",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -359,7 +359,7 @@ class thirdActivity : AppCompatActivity() {
 
         resetConstraints()
         saveHabitsToPrefs()
-        Toast.makeText(this, "已删除${selectedRows.size}个习惯", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "delete ${selectedRows.size} habit", Toast.LENGTH_SHORT).show()
         selectedRows.clear()
     }
 
